@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onShow } from '@dcloudio/uni-app'
 import { storeToRefs } from 'pinia'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
@@ -6,19 +7,29 @@ import FoodCollectCard from '@/components/FoodCollectCard/index.vue'
 import { useFoodsStore } from '@/stores/foods'
 
 const foodsStore = useFoodsStore()
-const {
-  unvisitedList,
-  visitedList,
-  unvisitedCount,
-  visitedCount,
-  totalCount,
-  progressPercent,
-} = storeToRefs(foodsStore)
+const { unvisitedList, visitedList, unvisitedCount, visitedCount, totalCount, progressPercent } =
+  storeToRefs(foodsStore)
+
+onShow(() => {
+  void foodsStore.fetchFoods()
+})
+
+function createFood() {
+  uni.navigateTo({
+    url: '/pages/content/create?kind=food',
+  })
+}
 </script>
 
 <template>
   <BasePage>
-    <CustomNavbar title="想吃清单" :show-back="true" :show-brand="false" />
+    <CustomNavbar title="想吃清单" :show-back="true" :show-brand="false">
+      <template #right>
+        <view class="navbar-add" hover-class="navbar-add--hover" @tap="createFood">
+          <text class="navbar-add__icon">＋</text>
+        </view>
+      </template>
+    </CustomNavbar>
 
     <view class="eat">
       <view class="tip-card">
@@ -40,7 +51,9 @@ const {
       </view>
 
       <view class="section">
-        <text class="section__title section__title--unvisited">还没吃 · {{ unvisitedCount }} 家</text>
+        <text class="section__title section__title--unvisited"
+          >还没吃 · {{ unvisitedCount }} 家</text
+        >
         <view class="grid">
           <FoodCollectCard v-for="item in unvisitedList" :key="item.id" :item="item" />
         </view>
@@ -57,6 +70,25 @@ const {
 </template>
 
 <style lang="scss" scoped>
+.navbar-add {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar-add--hover {
+  opacity: 0.55;
+}
+
+.navbar-add__icon {
+  color: #ff7b58;
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+}
+
 .eat {
   display: flex;
   flex-direction: column;

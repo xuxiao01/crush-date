@@ -29,6 +29,8 @@ const showInvite = ref(false)
 
 onShow(() => {
   showInvite.value = true
+  void foodsStore.fetchFoods()
+  void placesStore.fetchPlaces()
 })
 
 function handleCitySwitch() {

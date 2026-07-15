@@ -4,13 +4,15 @@
 
 本文档只整理小程序和 H5 前端需要调用的接口。
 
-后台管理端用于上传和维护美食库、地点库，其接口后续在后台项目中单独设计，不在本文档展开。
+美食和地点由当前 H5、小程序中的新建页面录入，不再单独依赖后台管理页面。
 
 ## 图片建议
 
 美食和地点图片建议上传到 OSS，并通过 CDN 域名访问。数据库只保存图片地址或 OSS `objectKey`，不保存图片二进制内容。
 
 接口给前端返回可直接展示的 `image` URL。后续可以根据使用场景返回缩略图，避免列表页加载原图。
+
+新建内容时，前端先把单张图片上传到 OSS，再将得到的图片 URL 传给新增接口。
 
 ## 1. 美食列表
 
@@ -54,7 +56,55 @@ GET /api/places?page=1&pageSize=20
 }
 ```
 
-## 3. 新增计划
+## 3. 新增美食或地点
+
+美食和地点共用一个接口，通过 `contentType` 区分类型。
+
+```http
+POST /api/content-items
+Content-Type: application/json
+```
+
+新增美食：
+
+```json
+{
+  "contentType": "food",
+  "name": "阿里郎朝鲜烤肉",
+  "type": "烤肉 · 朝鲜风味",
+  "comment": "想一起去感受一下当太阳的感觉！",
+  "image": "https://cdn.example.com/foods/food-new.webp"
+}
+```
+
+新增地点：
+
+```json
+{
+  "contentType": "place",
+  "name": "颐和园傍晚散步",
+  "type": "公园 · 散步",
+  "comment": "想慢慢走完长廊，再看一眼湖面。",
+  "image": "https://cdn.example.com/places/place-new.webp"
+}
+```
+
+返回新建后的完整数据：
+
+```json
+{
+  "id": "food-13",
+  "contentType": "food",
+  "name": "阿里郎朝鲜烤肉",
+  "type": "烤肉 · 朝鲜风味",
+  "comment": "想一起去感受一下当太阳的感觉！",
+  "image": "https://cdn.example.com/foods/food-new.webp"
+}
+```
+
+`contentType` 取值：`food | place`。
+
+## 4. 新增计划
 
 ```http
 POST /api/plans
@@ -99,7 +149,7 @@ Content-Type: application/json
 - `active`：本次计划，`date` 必填。
 - `backup`：备用计划，`date` 必须为 `null`。
 
-## 4. 计划列表
+## 5. 计划列表
 
 ```http
 GET /api/plans
@@ -210,12 +260,12 @@ GET /api/plans
 
 `currentPlans` 中只允许有一条 `planType = active` 的计划，但可以有多条 `backup`。
 
-## 5. 计划增删改查
+## 6. 计划增删改查
 
-| Method | Path | 用途 |
-| --- | --- | --- |
-| `GET` | `/api/plans/{id}` | 获取计划详情 |
-| `PATCH` | `/api/plans/{id}` | 修改计划信息和安排 |
+| Method   | Path              | 用途                   |
+| -------- | ----------------- | ---------------------- |
+| `GET`    | `/api/plans/{id}` | 获取计划详情           |
+| `PATCH`  | `/api/plans/{id}` | 修改计划信息和安排     |
 | `DELETE` | `/api/plans/{id}` | 删除本次计划或备用计划 |
 
 `PATCH` 可以直接提交完整的 `items`，前端暂时不需要再分成多个安排子接口。
@@ -251,7 +301,6 @@ PlanItem 数组示例（同一计划可以有多个安排）：
 
 ## 暂时不写的内容
 
-- 后台管理端的美食、地点上传接口。
 - OSS 签名上传接口。
 - 登录和用户体系。
 - 照片、回忆和分享接口。

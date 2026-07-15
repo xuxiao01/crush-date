@@ -54,7 +54,9 @@ onUnmounted(() => {
   restorePageTabBar()
 })
 
-function close() { emit('update:modelValue', false) }
+function close() {
+  emit('update:modelValue', false)
+}
 
 function selectScenario(value: PlanScenario) {
   scenario.value = value
@@ -70,14 +72,20 @@ function submit() {
   }
   if (props.plan) {
     plansStore.updatePlanMeta(props.plan.id, {
-      title: title.value, scenario: scenario.value, scenarioText: scenarioText.value, note: note.value,
+      title: title.value,
+      scenario: scenario.value,
+      scenarioText: scenarioText.value,
+      note: note.value,
     })
     close()
     emit('saved', props.plan.id)
     return
   }
   const result = plansStore.createBackup({
-    title: title.value, scenario: scenario.value, scenarioText: scenarioText.value, note: note.value,
+    title: title.value,
+    scenario: scenario.value,
+    scenarioText: scenarioText.value,
+    note: note.value,
   })
   if (result.ok) {
     close()
@@ -96,37 +104,135 @@ function submit() {
       </view>
       <text class="label">天气场景</text>
       <view class="scenarios">
-        <view v-for="value in options" :key="value" class="scenario" :class="{ 'scenario--active': scenario === value }" @tap="selectScenario(value)">
+        <view
+          v-for="value in options"
+          :key="value"
+          class="scenario"
+          :class="{ 'scenario--active': scenario === value }"
+          @tap="selectScenario(value)"
+        >
           <text class="scenario__text">{{ SCENARIO_LABELS[value] }}</text>
         </view>
       </view>
       <view class="field field--input">
         <text class="field__label">场景标签</text>
-        <input v-model="scenarioText" class="field__input" maxlength="30" placeholder="炎热 · 室内 · 不晒" />
+        <input
+          v-model="scenarioText"
+          class="field__input"
+          maxlength="30"
+          placeholder="炎热 · 室内 · 不晒"
+        />
       </view>
       <view class="field field--input">
         <text class="field__label">备注（可选）</text>
-        <input v-model="note" class="field__input" maxlength="60" placeholder="记录这个方案适合什么时候" />
+        <input
+          v-model="note"
+          class="field__input"
+          maxlength="60"
+          placeholder="记录这个方案适合什么时候"
+        />
       </view>
-      <view class="submit" @tap="submit"><text class="submit__text">保存备用计划</text></view>
+      <view class="submit" @tap="submit">
+        <text class="submit__text">{{ plan ? '保存修改' : '保存并进入行程规划' }}</text>
+      </view>
     </view>
   </view>
 </template>
 
 <style lang="scss" scoped>
-.mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; background: rgba(40, 24, 16, 0.35); }
-.sheet { width: 100%; max-height: 88vh; overflow-y: auto; padding: 32rpx 28rpx calc(28rpx + env(safe-area-inset-bottom)); border-radius: 28rpx 28rpx 0 0; background: #fffaf6; box-sizing: border-box; }
-.title { display: block; margin-bottom: 28rpx; font-size: 34rpx; font-weight: 700; color: #2f2f2f; }
-.label { display: block; margin: 4rpx 0 14rpx; font-size: 24rpx; color: #9a6a4a; }
-.field { min-height: 88rpx; margin-bottom: 16rpx; padding: 0 24rpx; border: 2rpx solid #ffe4d2; border-radius: 20rpx; background: #fff; box-sizing: border-box; }
-.field--input { display: flex; flex-direction: column; justify-content: center; gap: 8rpx; padding-top: 16rpx; padding-bottom: 16rpx; }
-.field__label { font-size: 24rpx; color: #9a6a4a; }
-.field__input { width: 100%; font-size: 28rpx; color: #2f2f2f; }
-.scenarios { display: flex; gap: 10rpx; margin-bottom: 18rpx; }
-.scenario { flex: 1; height: 64rpx; display: flex; align-items: center; justify-content: center; border-radius: 999rpx; background: #fff0e6; }
-.scenario--active { background: linear-gradient(135deg, #ff8a55, #ff8f9d); }
-.scenario__text { font-size: 23rpx; color: #8a6548; }
-.scenario--active .scenario__text { color: #fff; font-weight: 600; }
-.submit { margin-top: 24rpx; height: 92rpx; display: flex; align-items: center; justify-content: center; border-radius: 999rpx; background: linear-gradient(90deg, #ff8a55, #ff8f9d); }
-.submit__text { font-size: 30rpx; font-weight: 600; color: #fff; }
+.mask {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(40, 24, 16, 0.35);
+}
+.sheet {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 32rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  border-radius: 28rpx 28rpx 0 0;
+  background: #fffaf6;
+  box-sizing: border-box;
+}
+.title {
+  display: block;
+  margin-bottom: 28rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #2f2f2f;
+}
+.label {
+  display: block;
+  margin: 4rpx 0 14rpx;
+  font-size: 24rpx;
+  color: #9a6a4a;
+}
+.field {
+  min-height: 88rpx;
+  margin-bottom: 16rpx;
+  padding: 0 24rpx;
+  border: 2rpx solid #ffe4d2;
+  border-radius: 20rpx;
+  background: #fff;
+  box-sizing: border-box;
+}
+.field--input {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8rpx;
+  padding-top: 16rpx;
+  padding-bottom: 16rpx;
+}
+.field__label {
+  font-size: 24rpx;
+  color: #9a6a4a;
+}
+.field__input {
+  width: 100%;
+  font-size: 28rpx;
+  color: #2f2f2f;
+}
+.scenarios {
+  display: flex;
+  gap: 10rpx;
+  margin-bottom: 18rpx;
+}
+.scenario {
+  flex: 1;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: #fff0e6;
+}
+.scenario--active {
+  background: linear-gradient(135deg, #ff8a55, #ff8f9d);
+}
+.scenario__text {
+  font-size: 23rpx;
+  color: #8a6548;
+}
+.scenario--active .scenario__text {
+  color: #fff;
+  font-weight: 600;
+}
+.submit {
+  margin-top: 24rpx;
+  height: 92rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #ff8a55, #ff8f9d);
+}
+.submit__text {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #fff;
+}
 </style>

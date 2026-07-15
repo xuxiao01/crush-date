@@ -31,6 +31,7 @@ const slots = useSlots()
 const statusBarHeight = ref(0)
 const navBarHeight = ref(44)
 const sideWidth = ref(44)
+const rightSafeInset = ref(0)
 
 function initLayout() {
   try {
@@ -39,22 +40,26 @@ function initLayout() {
 
     let nextNavHeight = 44
     let nextSideWidth = 44
+    let nextRightSafeInset = 0
 
     // #ifdef MP-WEIXIN
     const menu = uni.getMenuButtonBoundingClientRect()
     if (menu && menu.width > 0 && menu.height > 0) {
       nextNavHeight = (menu.top - statusBarHeight.value) * 2 + menu.height
       nextSideWidth = Math.max(44, sys.windowWidth - menu.left)
+      nextRightSafeInset = Math.max(0, sys.windowWidth - menu.left + 4)
     }
     // #endif
 
     navBarHeight.value = nextNavHeight > 0 ? nextNavHeight : 44
     sideWidth.value = nextSideWidth > 0 ? nextSideWidth : 44
+    rightSafeInset.value = nextRightSafeInset
   } catch (error) {
     console.warn('[CustomNavbar] layout init failed', error)
     statusBarHeight.value = 0
     navBarHeight.value = 44
     sideWidth.value = 44
+    rightSafeInset.value = 0
   }
 }
 
@@ -143,15 +148,17 @@ function handleBack() {
           class="custom-navbar__side custom-navbar__side--right"
           :style="{ width: hasRight || titleAlign === 'center' ? `${sideWidth}px` : 'auto' }"
         >
-          <slot name="right" />
+          <view
+            class="custom-navbar__right-content"
+            :style="{ marginRight: `${rightSafeInset}px` }"
+          >
+            <slot name="right" />
+          </view>
         </view>
       </view>
     </view>
 
-    <view
-      class="custom-navbar__placeholder"
-      :style="{ height: `${totalHeight}px` }"
-    />
+    <view class="custom-navbar__placeholder" :style="{ height: `${totalHeight}px` }" />
   </view>
 </template>
 
@@ -196,6 +203,10 @@ function handleBack() {
 .custom-navbar__side--right {
   justify-content: flex-end;
   min-width: 44px;
+}
+
+.custom-navbar__right-content {
+  flex-shrink: 0;
 }
 
 .custom-navbar__center {

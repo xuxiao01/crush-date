@@ -30,7 +30,7 @@ function completePlan() {
   if (!plan.value) return
   const result = plansStore.completeActive(plan.value.id)
   if (!result.ok) return
-  uni.redirectTo({ url: `/pages/plan/completed-detail?id=${encodeURIComponent(result.plan.id)}` })
+  backToList()
 }
 </script>
 

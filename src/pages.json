@@ -61,6 +61,12 @@
       }
     },
     {
+      "path": "pages/content/create",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/memories/album",
       "style": {
         "navigationStyle": "custom"

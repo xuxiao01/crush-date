@@ -4,6 +4,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
 import AddPlanSheet from '@/components/plan/AddPlanSheet.vue'
+import { deleteContentItem } from '@/api/content'
 import { usePlacesStore } from '@/stores/places'
 import { usePlansStore } from '@/stores/plans'
 
@@ -13,6 +14,7 @@ const placeId = ref('')
 const animating = ref(false)
 const showBadge = ref(false)
 const showAddPlan = ref(false)
+const deleting = ref(false)
 
 const place = computed(() => (placeId.value ? placesStore.getById(placeId.value) : undefined))
 const navTitle = computed(() => place.value?.name || '想去详情')
@@ -36,10 +38,67 @@ function handleMarkVisited() {
 
   setTimeout(() => {
     animating.value = false
-  }, 400)
+    uni.navigateBack()
+  }, 350)
 }
 
-function onAddSuccess({ planId, planStatus, label }: { planId: string; planStatus: 'active' | 'backup' | 'completed'; label: string }) {
+async function performDelete() {
+  const target = place.value
+  if (!target || deleting.value) return
+
+  deleting.value = true
+  uni.showLoading({ title: '正在删除…', mask: true })
+  try {
+    await deleteContentItem(target.id)
+    placesStore.removePlace(target.id)
+  } catch {
+    return
+  } finally {
+    deleting.value = false
+    uni.hideLoading()
+  }
+
+  uni.showToast({ title: '已删除', icon: 'success' })
+  setTimeout(() => {
+    uni.navigateBack()
+  }, 450)
+}
+
+function confirmDelete() {
+  if (!place.value || deleting.value) return
+
+  uni.showModal({
+    title: '删除地点',
+    content: `确定删除“${place.value.name}”吗？删除后无法恢复。`,
+    confirmText: '删除',
+    confirmColor: '#e76546',
+    success: (result) => {
+      if (result.confirm) void performDelete()
+    },
+  })
+}
+
+function handleMore() {
+  if (!place.value || deleting.value) return
+
+  uni.showActionSheet({
+    itemList: ['删除地点'],
+    itemColor: '#e76546',
+    success: (result) => {
+      if (result.tapIndex === 0) confirmDelete()
+    },
+  })
+}
+
+function onAddSuccess({
+  planId,
+  planStatus,
+  label,
+}: {
+  planId: string
+  planStatus: 'active' | 'backup' | 'completed'
+  label: string
+}) {
   uni.showModal({
     title: '加入成功',
     content: `已加入${label}`,
@@ -57,7 +116,13 @@ function onAddSuccess({ planId, planStatus, label }: { planId: string; planStatu
 
 <template>
   <BasePage>
-    <CustomNavbar :title="navTitle" :show-back="true" :show-brand="false" />
+    <CustomNavbar :title="navTitle" :show-back="true" :show-brand="false">
+      <template #right>
+        <view v-if="place" class="navbar-more" hover-class="navbar-more--hover" @tap="handleMore">
+          <text class="navbar-more__icon">•••</text>
+        </view>
+      </template>
+    </CustomNavbar>
 
     <view v-if="place" class="detail">
       <view class="detail__cover-wrap">
@@ -132,6 +197,27 @@ function onAddSuccess({ planId, planStatus, label }: { planId: string; planStatu
 </template>
 
 <style lang="scss" scoped>
+.navbar-more {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar-more--hover {
+  opacity: 0.5;
+}
+
+.navbar-more__icon {
+  color: #2f2f2f;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1;
+  transform: translateY(-2px);
+}
+
 .detail {
   display: flex;
   flex-direction: column;
@@ -197,22 +283,30 @@ function onAddSuccess({ planId, planStatus, label }: { planId: string; planStatu
 }
 
 .detail__name {
+  min-width: 0;
   font-size: 44rpx;
   font-weight: 700;
   color: #252525;
   line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .detail__type {
+  min-width: 0;
   font-size: 26rpx;
   color: #999999;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .detail__quote {
   display: flex;
   align-items: flex-start;
   gap: 8rpx;
+  min-width: 0;
+  overflow: hidden;
   margin-top: 8rpx;
   padding: 22rpx 20rpx;
   border-radius: 20rpx;
@@ -229,10 +323,14 @@ function onAddSuccess({ planId, planStatus, label }: { planId: string; planStatu
 
 .detail__comment {
   flex: 1;
+  min-width: 0;
   font-size: 28rpx;
   font-weight: 500;
   color: #6b5344;
   line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .detail__status {
