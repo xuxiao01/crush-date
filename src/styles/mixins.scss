@@ -1,0 +1,10 @@
+@mixin card-surface {
+  background: #fff;
+  border-radius: $border-radius-card;
+  box-shadow: 0 12rpx 40rpx rgba(255, 143, 112, 0.12);
+}
+
+@mixin safe-page-padding {
+  padding-bottom: calc(#{$page-padding} + env(safe-area-inset-bottom));
+  padding-top: calc(#{$page-padding} + env(safe-area-inset-top));
+}
