@@ -20,20 +20,23 @@ const food = computed(() => (foodId.value ? foodsStore.getById(foodId.value) : u
 const navTitle = computed(() => food.value?.name || '美食详情')
 
 onLoad((query) => {
-  plansStore.hydrate()
+  void plansStore.hydrate()
   foodId.value = typeof query?.id === 'string' ? decodeURIComponent(query.id) : ''
   if (food.value?.status === 'visited') {
     showBadge.value = true
   }
 })
 
-function handleMarkVisited() {
+async function handleMarkVisited() {
   if (!food.value || food.value.status === 'visited' || animating.value) return
 
-  const ok = foodsStore.markVisited(food.value.id)
-  if (!ok) return
-
   animating.value = true
+  const ok = await foodsStore.markVisited(food.value.id)
+  if (!ok) {
+    animating.value = false
+    return
+  }
+
   showBadge.value = true
 
   setTimeout(() => {

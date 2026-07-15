@@ -17,6 +17,8 @@ export interface ContentItemResponse {
   type: string
   comment: string
   image: string
+  visited: boolean
+  visitedAt: string | null
 }
 
 export type ContentItemListItem = Omit<ContentItemResponse, 'contentType'>
@@ -91,5 +93,16 @@ export function deleteContentItem(id: string): Promise<void> {
   return request<void>({
     url: `/api/crush-date/content-items/${encodeURIComponent(id)}`,
     method: 'DELETE',
+  })
+}
+
+export function updateContentItemVisited(
+  id: string,
+  visited: boolean,
+): Promise<ContentItemResponse> {
+  return request<ContentItemResponse>({
+    url: `/api/crush-date/content-items/${encodeURIComponent(id)}/visited`,
+    method: 'PATCH',
+    data: { visited },
   })
 }

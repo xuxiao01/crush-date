@@ -1,12 +1,26 @@
 const baseURL = import.meta.env.VITE_API_BASE_URL || ''
 
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 interface RequestOptions {
   url: string
   method?: HttpMethod
-  data?: Record<string, unknown>
+  data?: unknown
   header?: Record<string, string>
+}
+
+interface ErrorResponse {
+  message?: string
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
 }
 
 function showRequestError(message = '请求失败'): void {
@@ -22,8 +36,8 @@ export function request<T>(options: RequestOptions): Promise<T> {
   return new Promise((resolve, reject) => {
     uni.request({
       url: `${baseURL}${url}`,
-      method,
-      data,
+      method: method as UniApp.RequestOptions['method'],
+      data: data as UniApp.RequestOptions['data'],
       header,
       success: (response) => {
         const statusCode = response.statusCode || 0
@@ -33,8 +47,10 @@ export function request<T>(options: RequestOptions): Promise<T> {
           return
         }
 
-        showRequestError()
-        reject(new Error(`Request failed with status ${statusCode}`))
+        const data = response.data as ErrorResponse | undefined
+        const message = data?.message || `请求失败（${statusCode}）`
+        showRequestError(message)
+        reject(new ApiError(message, statusCode))
       },
       fail: (error) => {
         showRequestError()

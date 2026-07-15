@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
-import { getContentItemList } from '@/api/content'
+import { getContentItemList, updateContentItemVisited } from '@/api/content'
 import type { PlaceCardItem } from '@/types/place'
 
-function formatVisitedDate(date = new Date()): string {
+function formatVisitedDate(value: string | null): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
@@ -36,17 +39,15 @@ export const usePlacesStore = defineStore('places', {
 
       this.loading = true
       try {
-        const statusById = new Map(
-          this.list.map((item) => [
-            item.id,
-            { status: item.status, visitedDate: item.visitedDate },
-          ]),
-        )
         const response = await getContentItemList('place')
         this.list = response.list.map((item) => ({
-          ...item,
-          status: statusById.get(item.id)?.status ?? 'unvisited',
-          visitedDate: statusById.get(item.id)?.visitedDate ?? '',
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          comment: item.comment,
+          image: item.image,
+          status: item.visited ? 'visited' : 'unvisited',
+          visitedDate: formatVisitedDate(item.visitedAt),
         }))
         return true
       } catch {
@@ -74,13 +75,25 @@ export const usePlacesStore = defineStore('places', {
     getById(id: string) {
       return this.list.find((item) => item.id === id)
     },
-    markVisited(id: string) {
+    async setVisited(id: string, visited: boolean) {
       const target = this.list.find((item) => item.id === id)
-      if (!target || target.status === 'visited') return false
+      if (!target) return false
 
-      target.status = 'visited'
-      target.visitedDate = formatVisitedDate()
-      return true
+      const nextStatus = visited ? 'visited' : 'unvisited'
+      if (target.status === nextStatus) return true
+
+      try {
+        const updated = await updateContentItemVisited(id, visited)
+        target.status = updated.visited ? 'visited' : 'unvisited'
+        target.visitedDate = formatVisitedDate(updated.visitedAt)
+        return true
+      } catch {
+        return false
+      }
+    },
+
+    markVisited(id: string) {
+      return this.setVisited(id, true)
     },
   },
 })

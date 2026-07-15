@@ -65,23 +65,24 @@ function selectScenario(value: PlanScenario) {
   }
 }
 
-function submit() {
+async function submit() {
   if (!title.value.trim()) {
     uni.showToast({ title: '请填写备用计划标题', icon: 'none' })
     return
   }
   if (props.plan) {
-    plansStore.updatePlanMeta(props.plan.id, {
+    const saved = await plansStore.updatePlanMeta(props.plan.id, {
       title: title.value,
       scenario: scenario.value,
       scenarioText: scenarioText.value,
       note: note.value,
     })
+    if (!saved) return
     close()
     emit('saved', props.plan.id)
     return
   }
-  const result = plansStore.createBackup({
+  const result = await plansStore.createBackup({
     title: title.value,
     scenario: scenario.value,
     scenarioText: scenarioText.value,

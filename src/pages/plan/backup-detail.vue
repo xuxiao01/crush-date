@@ -19,7 +19,7 @@ const date = ref(toPlanDateString())
 const plan = computed(() => plansStore.getById(planId.value))
 
 onLoad((query) => {
-  plansStore.hydrate()
+  void plansStore.hydrate()
   planId.value = typeof query?.id === 'string' ? decodeURIComponent(query.id) : ''
 })
 
@@ -44,19 +44,19 @@ function requestActivate() {
   date.value = toPlanDateString()
   showDate.value = true
 }
-function activate(value: string) {
+async function activate(value: string) {
   if (!plan.value) return
-  const result = plansStore.activateBackup(plan.value.id, value)
+  const result = await plansStore.activateBackup(plan.value.id, value)
   if (!result.ok) {
     if (result.reason === 'active_exists') showConflict()
     else uni.showToast({ title: '设为本次计划失败', icon: 'none' })
     return
   }
-  uni.redirectTo({ url: `/pages/plan/detail?id=${encodeURIComponent(result.plan.id)}` })
+  uni.switchTab({ url: '/pages/plan/index' })
 }
-function deletePlan() {
+async function deletePlan() {
   if (!plan.value) return
-  plansStore.deletePlan(plan.value.id)
+  if (!(await plansStore.deletePlan(plan.value.id))) return
   uni.switchTab({ url: '/pages/plan/index' })
 }
 function openEdit() {

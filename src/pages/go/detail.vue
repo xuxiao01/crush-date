@@ -20,20 +20,23 @@ const place = computed(() => (placeId.value ? placesStore.getById(placeId.value)
 const navTitle = computed(() => place.value?.name || '想去详情')
 
 onLoad((query) => {
-  plansStore.hydrate()
+  void plansStore.hydrate()
   placeId.value = typeof query?.id === 'string' ? decodeURIComponent(query.id) : ''
   if (place.value?.status === 'visited') {
     showBadge.value = true
   }
 })
 
-function handleMarkVisited() {
+async function handleMarkVisited() {
   if (!place.value || place.value.status === 'visited' || animating.value) return
 
-  const ok = placesStore.markVisited(place.value.id)
-  if (!ok) return
-
   animating.value = true
+  const ok = await placesStore.markVisited(place.value.id)
+  if (!ok) {
+    animating.value = false
+    return
+  }
+
   showBadge.value = true
 
   setTimeout(() => {

@@ -78,7 +78,7 @@ function onCitySelect({ item }: { item: { name: string }; index: number }) {
         />
         <HomeListCard
           title="想去清单"
-          description="公园、KTV、桌游、散步……"
+          description="公园、爬山、KTV……"
           :count="goTotalCount"
           :image="castleImage"
           theme="play"

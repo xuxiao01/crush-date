@@ -26,6 +26,7 @@ export interface Plan {
   sourceBackupId: string | null
   completedAt: string | null
   createdAt: string
+  updatedAt?: string
   /** Read-only memory photos for completed plans. Uploading is out of scope for now. */
   memoryPhotos: string[]
 }
