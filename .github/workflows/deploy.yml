@@ -43,8 +43,25 @@ jobs:
 
       - name: Build H5
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          # The H5 page and API share the same host. Keep requests relative so
+          # the current HTTP deployment does not depend on the HTTPS domain.
+          VITE_API_BASE_URL: ''
         run: pnpm build:h5
+
+      - name: Validate H5 build
+        run: |
+          test -f dist/build/h5/index.html
+
+          if ! grep -q '/eidolonh5/assets/' dist/build/h5/index.html; then
+            echo 'H5 asset base is invalid; refusing to overwrite production.'
+            cat dist/build/h5/index.html
+            exit 1
+          fi
+
+          if grep -Rqs 'https://xuxiaoapi.online' dist/build/h5; then
+            echo 'H5 still contains the unavailable HTTPS API domain.'
+            exit 1
+          fi
 
       - name: Deploy H5 to server
         uses: appleboy/scp-action@v0.1.7
