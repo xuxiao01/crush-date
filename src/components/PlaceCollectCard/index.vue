@@ -52,7 +52,7 @@ function goDetail() {
 
 <style lang="scss" scoped>
 .place-card {
-  width: calc((100% - 20rpx) / 2);
+  width: 100%;
   overflow: hidden;
   border-radius: 24rpx;
   background: #ffffff;

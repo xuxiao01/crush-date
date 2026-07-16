@@ -48,6 +48,8 @@ const hasItems = computed(() => props.items.length > 0)
   display: flex;
   flex-direction: column;
   gap: 12rpx;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .section__head {

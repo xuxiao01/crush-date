@@ -55,14 +55,18 @@ function createFood() {
           >还没吃 · {{ unvisitedCount }} 家</text
         >
         <view class="grid">
-          <FoodCollectCard v-for="item in unvisitedList" :key="item.id" :item="item" />
+          <view v-for="item in unvisitedList" :key="item.id" class="grid__item">
+            <FoodCollectCard :item="item" />
+          </view>
         </view>
       </view>
 
       <view class="section">
         <text class="section__title section__title--visited">吃过啦 · {{ visitedCount }} 家</text>
         <view class="grid">
-          <FoodCollectCard v-for="item in visitedList" :key="item.id" :item="item" />
+          <view v-for="item in visitedList" :key="item.id" class="grid__item">
+            <FoodCollectCard :item="item" />
+          </view>
         </view>
       </view>
     </view>
@@ -199,5 +203,10 @@ function createFood() {
   display: flex;
   flex-wrap: wrap;
   gap: 20rpx;
+}
+
+.grid__item {
+  width: calc((100% - 20rpx) / 2);
+  min-width: 0;
 }
 </style>

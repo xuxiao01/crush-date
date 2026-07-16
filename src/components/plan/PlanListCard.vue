@@ -30,7 +30,7 @@ const route = computed(() => {
 </template>
 
 <style lang="scss" scoped>
-.card { display: flex; align-items: center; gap: 20rpx; padding: 22rpx; border-radius: 24rpx; background: #fffdf9; border: 2rpx solid #ffe1d6; box-shadow: 0 8rpx 20rpx rgba(120, 70, 40, 0.04); transition: transform 160ms ease; }
+.card { display: flex; align-items: center; gap: 20rpx; width: 100%; padding: 22rpx; border-radius: 24rpx; background: #fffdf9; border: 2rpx solid #ffe1d6; box-shadow: 0 8rpx 20rpx rgba(120, 70, 40, 0.04); box-sizing: border-box; transition: transform 160ms ease; }
 .card--hover { transform: scale(0.985); }
 .card__cover { width: 112rpx; height: 132rpx; flex-shrink: 0; border-radius: 20rpx; }
 .card__cover--empty { display: flex; align-items: center; justify-content: center; background: #fff0e8; color: #d6a28b; font-size: 38rpx; }

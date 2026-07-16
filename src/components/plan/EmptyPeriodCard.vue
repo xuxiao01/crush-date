@@ -12,6 +12,7 @@ const emit = defineEmits<{
 
 <style lang="scss" scoped>
 .empty {
+  width: 100%;
   height: 100rpx;
   display: flex;
   align-items: center;

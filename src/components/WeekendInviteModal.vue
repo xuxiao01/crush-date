@@ -233,6 +233,10 @@ onUnmounted(() => {
           :class="{ 'birthday-input__cell--active': birthday.length === index - 1 }"
         >
           <text class="birthday-input__digit">{{ birthday[index - 1] || '' }}</text>
+          <view
+            v-if="birthday.length === index - 1 && birthday.length < BIRTHDAY_LENGTH"
+            class="birthday-input__caret"
+          />
         </view>
         <input
           class="birthday-input__control"
@@ -464,6 +468,7 @@ onUnmounted(() => {
 }
 
 .birthday-input__cell {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -490,13 +495,35 @@ onUnmounted(() => {
   line-height: 1;
 }
 
+.birthday-input__caret {
+  width: 3rpx;
+  height: 44rpx;
+  border-radius: 999rpx;
+  background: #ff8a55;
+  animation: birthday-caret-blink 1s steps(1) infinite;
+}
+
+@keyframes birthday-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
 .birthday-input__control {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: 0;
+  left: 50%;
+  width: 390rpx;
+  height: 96rpx;
   opacity: 0;
   color: transparent;
+  caret-color: transparent;
+  transform: translateX(-50%);
 }
 
 .birthday-card__error {

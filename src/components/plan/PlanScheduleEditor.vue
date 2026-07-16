@@ -229,6 +229,8 @@ async function pickCandidate(item: {
   display: flex;
   flex-direction: column;
   gap: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
 }
 .mask {
   position: fixed;

@@ -40,7 +40,7 @@ const summaries = computed(() =>
 </template>
 
 <style lang="scss" scoped>
-.hero { display: flex; align-items: stretch; gap: 24rpx; min-height: 320rpx; padding: 32rpx; border-radius: 32rpx; background: linear-gradient(135deg, #ffe0c9 0%, #ffd4e1 100%); box-shadow: 0 14rpx 36rpx rgba(255, 138, 85, 0.16); box-sizing: border-box; transition: transform 160ms ease; }
+.hero { display: flex; align-items: stretch; gap: 24rpx; width: 100%; min-height: 320rpx; padding: 32rpx; border-radius: 32rpx; background: linear-gradient(135deg, #ffe0c9 0%, #ffd4e1 100%); box-shadow: 0 14rpx 36rpx rgba(255, 138, 85, 0.16); box-sizing: border-box; transition: transform 160ms ease; }
 .hero--hover { transform: scale(0.985); }
 .hero__content { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
 .hero__date { font-size: 40rpx; font-weight: 700; color: #2f2f2f; line-height: 1.3; }

@@ -55,14 +55,18 @@ function createPlace() {
           >还没去 · {{ unvisitedCount }} 个</text
         >
         <view class="grid">
-          <PlaceCollectCard v-for="item in unvisitedList" :key="item.id" :item="item" />
+          <view v-for="item in unvisitedList" :key="item.id" class="grid__item">
+            <PlaceCollectCard :item="item" />
+          </view>
         </view>
       </view>
 
       <view class="section">
         <text class="section__title section__title--visited">去过了 · {{ visitedCount }} 个</text>
         <view class="grid">
-          <PlaceCollectCard v-for="item in visitedList" :key="item.id" :item="item" />
+          <view v-for="item in visitedList" :key="item.id" class="grid__item">
+            <PlaceCollectCard :item="item" />
+          </view>
         </view>
       </view>
     </view>
@@ -199,5 +203,10 @@ function createPlace() {
   display: flex;
   flex-wrap: wrap;
   gap: 20rpx;
+}
+
+.grid__item {
+  width: calc((100% - 20rpx) / 2);
+  min-width: 0;
 }
 </style>

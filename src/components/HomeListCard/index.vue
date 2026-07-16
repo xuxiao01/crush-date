@@ -41,7 +41,7 @@ function go() {
 <style lang="scss" scoped>
 .list-card {
   position: relative;
-  width: calc(100% - 48rpx);
+  width: 100%;
   height: 420rpx;
   margin: 0 auto;
   overflow: hidden;
@@ -49,6 +49,7 @@ function go() {
   border: 1px solid transparent;
   box-shadow: 0 12rpx 32rpx rgba(120, 70, 40, 0.06);
   transition: transform 180ms ease;
+  box-sizing: border-box;
 }
 
 .list-card:active,

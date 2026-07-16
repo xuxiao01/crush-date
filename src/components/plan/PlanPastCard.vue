@@ -32,10 +32,12 @@ const path = computed(() => {
 
 <style lang="scss" scoped>
 .past {
+  width: 100%;
   padding: 24rpx 28rpx;
   border-radius: 24rpx;
   background: #f4efe9;
   border: 2rpx solid #e6dbd2;
+  box-sizing: border-box;
   transition: transform 160ms ease;
 }
 

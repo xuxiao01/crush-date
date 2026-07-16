@@ -167,7 +167,10 @@ function onCitySelect({ item }: { item: { name: string }; index: number }) {
 .list-cards {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 28rpx;
+  width: 100%;
+  padding: 0 24rpx;
+  box-sizing: border-box;
 }
 </style>

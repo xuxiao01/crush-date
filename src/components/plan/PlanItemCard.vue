@@ -21,6 +21,7 @@ defineProps<{
   display: flex;
   align-items: flex-start;
   gap: 20rpx;
+  width: 100%;
   padding: 24rpx;
   border-radius: 24rpx;
   background: #fffdfb;
