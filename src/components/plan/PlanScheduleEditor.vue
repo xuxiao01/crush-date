@@ -1,33 +1,26 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import PeriodChips from '@/components/plan/PeriodChips.vue'
 import PlanPeriodSection from '@/components/plan/PlanPeriodSection.vue'
 import { useFoodsStore } from '@/stores/foods'
 import { usePlacesStore } from '@/stores/places'
 import { usePlansStore } from '@/stores/plans'
-import type { PlanItem, PlanItemType, PlanPeriod } from '@/types/plan'
+import type { PlanItemType, PlanPeriod } from '@/types/plan'
 import { PERIOD_LABELS, PERIOD_ORDER, itemTypeForPeriod } from '@/types/plan'
 
 const props = defineProps<{ planId: string; readonly?: boolean }>()
 const plansStore = usePlansStore()
 const foodsStore = useFoodsStore()
 const placesStore = usePlacesStore()
-const showItemPick = ref(false)
-const showItemMenu = ref(false)
-const showPeriodEdit = ref(false)
-const showNoteEdit = ref(false)
 const showPicker = ref(false)
-const pickerMode = ref<'add' | 'replace'>('add')
-const activeItem = ref<PlanItem | null>(null)
-const periodItems = ref<PlanItem[]>([])
+const showDeleteDialog = ref(false)
+const pendingRemoveItemId = ref('')
+const pendingRemoveTitle = ref('')
+const deleting = ref(false)
 const editPeriod = ref<PlanPeriod>('afternoon')
-const editNote = ref('')
 const addType = ref<PlanItemType>('place')
 
 const plan = computed(() => plansStore.getById(props.planId))
-const pickerTitle = computed(() =>
-  pickerMode.value === 'replace' ? '更换安排' : `添加${PERIOD_LABELS[editPeriod.value]}安排`,
-)
+const pickerTitle = computed(() => `添加${PERIOD_LABELS[editPeriod.value]}安排`)
 const candidates = computed(() =>
   addType.value === 'food'
     ? foodsStore.list.map((item) => ({
@@ -62,62 +55,33 @@ function itemsOf(period: PlanPeriod) {
 }
 function openAdd(period: PlanPeriod) {
   if (props.readonly) return
-  pickerMode.value = 'add'
   editPeriod.value = period
   addType.value = itemTypeForPeriod(period)
   showPicker.value = true
 }
-function openPeriodItems(period: PlanPeriod) {
+function requestRemoveItem(itemId: string) {
   if (props.readonly) return
-  const items = itemsOf(period)
-  if (items.length === 1) openItemMenu(items[0])
-  else if (items.length > 1) {
-    periodItems.value = items
-    showItemPick.value = true
+  const item = plan.value?.items.find((candidate) => candidate.id === itemId)
+  pendingRemoveItemId.value = itemId
+  pendingRemoveTitle.value = item?.title || '这条安排'
+  showDeleteDialog.value = true
+}
+function closeDeleteDialog() {
+  if (deleting.value) return
+  showDeleteDialog.value = false
+  pendingRemoveItemId.value = ''
+  pendingRemoveTitle.value = ''
+}
+async function confirmRemoveItem() {
+  if (!pendingRemoveItemId.value || deleting.value) return
+  deleting.value = true
+  const removed = await plansStore.removeItem(props.planId, pendingRemoveItemId.value)
+  deleting.value = false
+  if (!removed) {
+    uni.showToast({ title: '删除失败，请重试', icon: 'none' })
+    return
   }
-}
-function openItemMenu(item: PlanItem) {
-  activeItem.value = item
-  showItemPick.value = false
-  showItemMenu.value = true
-}
-function openReplace() {
-  if (!activeItem.value) return
-  pickerMode.value = 'replace'
-  editPeriod.value = activeItem.value.period
-  addType.value = activeItem.value.type
-  showItemMenu.value = false
-  showPicker.value = true
-}
-function openNote() {
-  if (!activeItem.value) return
-  editNote.value = activeItem.value.note
-  showItemMenu.value = false
-  showNoteEdit.value = true
-}
-async function saveNote() {
-  if (!activeItem.value) return
-  if (await plansStore.updateItemNote(props.planId, activeItem.value.id, editNote.value)) {
-    showNoteEdit.value = false
-  }
-}
-function openPeriod() {
-  if (!activeItem.value) return
-  editPeriod.value = activeItem.value.period
-  showItemMenu.value = false
-  showPeriodEdit.value = true
-}
-async function savePeriod() {
-  if (!activeItem.value) return
-  if (await plansStore.updateItemPeriod(props.planId, activeItem.value.id, editPeriod.value)) {
-    showPeriodEdit.value = false
-  }
-}
-async function removeItem() {
-  if (!activeItem.value) return
-  if (await plansStore.removeItem(props.planId, activeItem.value.id)) {
-    showItemMenu.value = false
-  }
+  closeDeleteDialog()
 }
 async function pickCandidate(item: {
   id: string
@@ -126,22 +90,14 @@ async function pickCandidate(item: {
   note: string
   type: PlanItemType
 }) {
-  if (!activeItem.value && pickerMode.value === 'replace') return
-  const result = await (pickerMode.value === 'replace'
-    ? plansStore.replaceItemSource(props.planId, activeItem.value!.id, {
-        type: item.type,
-        sourceId: item.id,
-        title: item.title,
-        image: item.image,
-      })
-    : plansStore.addItemToPlan(props.planId, {
-        type: item.type,
-        sourceId: item.id,
-        title: item.title,
-        image: item.image,
-        period: editPeriod.value,
-        note: item.note,
-      }))
+  const result = await plansStore.addItemToPlan(props.planId, {
+    type: item.type,
+    sourceId: item.id,
+    title: item.title,
+    image: item.image,
+    period: editPeriod.value,
+    note: item.note,
+  })
   if (!result.ok) {
     uni.showToast({
       title: result.reason === 'duplicate' ? '已经在这个计划里啦' : '操作失败',
@@ -162,44 +118,34 @@ async function pickCandidate(item: {
       :items="itemsOf(period)"
       :readonly="readonly"
       @add="openAdd(period)"
-      @edit="openPeriodItems(period)"
+      @remove="requestRemoveItem"
     />
   </view>
 
-  <view v-if="showItemPick" class="mask" @tap="showItemPick = false"
-    ><view class="menu" @tap.stop
-      ><text class="menu__title">要改哪一条</text
-      ><view v-for="item in periodItems" :key="item.id" class="menu__item" @tap="openItemMenu(item)"
-        ><text>{{ item.title }}</text></view
-      ><view class="menu__item" @tap="showItemPick = false"><text>取消</text></view></view
-    ></view
-  >
-  <view v-if="showItemMenu" class="mask" @tap="showItemMenu = false"
-    ><view class="menu" @tap.stop
-      ><view class="menu__item" @tap="openReplace"><text>更换安排</text></view
-      ><view class="menu__item" @tap="openNote"><text>修改备注</text></view
-      ><view class="menu__item" @tap="openPeriod"><text>调整时间段</text></view
-      ><view class="menu__item" @tap="removeItem"><text class="danger">删除安排</text></view
-      ><view class="menu__item" @tap="showItemMenu = false"><text>取消</text></view></view
-    ></view
-  >
-  <view v-if="showPeriodEdit" class="mask" @tap="showPeriodEdit = false"
-    ><view class="sheet" @tap.stop
-      ><text class="sheet__title">调整时间段</text><PeriodChips v-model="editPeriod" /><view
-        class="submit"
-        @tap="savePeriod"
-        ><text>保存</text></view
-      ></view
-    ></view
-  >
-  <view v-if="showNoteEdit" class="mask" @tap="showNoteEdit = false"
-    ><view class="sheet" @tap.stop
-      ><text class="sheet__title">修改备注</text
-      ><input v-model="editNote" class="input" maxlength="40" /><view class="submit" @tap="saveNote"
-        ><text>保存</text></view
-      ></view
-    ></view
-  >
+  <view v-if="showDeleteDialog" class="confirm-mask" @tap="closeDeleteDialog">
+    <view class="confirm-dialog" @tap.stop>
+      <text class="confirm-dialog__title">删除安排</text>
+      <text class="confirm-dialog__desc">确定要删除“{{ pendingRemoveTitle }}”吗？</text>
+      <view class="confirm-dialog__actions">
+        <view
+          class="confirm-dialog__button confirm-dialog__button--secondary"
+          hover-class="confirm-dialog__button--hover"
+          @tap="closeDeleteDialog"
+        >
+          <text>取消</text>
+        </view>
+        <view
+          class="confirm-dialog__button confirm-dialog__button--primary"
+          :class="{ 'confirm-dialog__button--disabled': deleting }"
+          hover-class="confirm-dialog__button--hover"
+          @tap="confirmRemoveItem"
+        >
+          <text>删除</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view v-if="showPicker" class="mask" @tap="showPicker = false"
     ><view class="sheet sheet--tall" @tap.stop
       ><text class="sheet__title">{{ pickerTitle }}</text
@@ -232,6 +178,75 @@ async function pickCandidate(item: {
   width: 100%;
   box-sizing: border-box;
 }
+.confirm-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  background: rgba(53, 40, 33, 0.48);
+  box-sizing: border-box;
+}
+.confirm-dialog {
+  width: 100%;
+  max-width: 600rpx;
+  padding: 46rpx 36rpx 34rpx;
+  border: 2rpx solid rgba(255, 221, 204, 0.9);
+  border-radius: 36rpx;
+  background: #fffaf6;
+  box-shadow: 0 28rpx 72rpx rgba(92, 51, 31, 0.22);
+  box-sizing: border-box;
+}
+.confirm-dialog__title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2f2f2f;
+  line-height: 1.35;
+  text-align: center;
+}
+.confirm-dialog__desc {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #9b8578;
+  line-height: 1.6;
+  text-align: center;
+}
+.confirm-dialog__actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 34rpx;
+}
+.confirm-dialog__button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 86rpx;
+  border-radius: 999rpx;
+  font-size: 27rpx;
+  font-weight: 600;
+  transition: opacity 160ms ease;
+}
+.confirm-dialog__button--secondary {
+  border: 2rpx solid #ffcbb3;
+  background: #fff;
+  color: #b0765c;
+}
+.confirm-dialog__button--primary {
+  background: linear-gradient(90deg, #ff8a55, #ff8f9d);
+  box-shadow: 0 10rpx 24rpx rgba(255, 138, 85, 0.25);
+  color: #fff;
+}
+.confirm-dialog__button--hover {
+  opacity: 0.86;
+}
+.confirm-dialog__button--disabled {
+  opacity: 0.58;
+}
 .mask {
   position: fixed;
   inset: 0;
@@ -240,10 +255,8 @@ async function pickCandidate(item: {
   align-items: flex-end;
   background: rgba(40, 24, 16, 0.35);
 }
-.menu,
 .sheet {
   width: 100%;
-  padding: 18rpx 0 calc(18rpx + env(safe-area-inset-bottom));
   border-radius: 28rpx 28rpx 0 0;
   background: #fffaf6;
   box-sizing: border-box;
@@ -256,46 +269,14 @@ async function pickCandidate(item: {
   display: flex;
   flex-direction: column;
 }
-.menu__title,
 .sheet__title {
   display: block;
-  padding: 12rpx 28rpx 22rpx;
   font-size: 31rpx;
   font-weight: 700;
   color: #2f2f2f;
 }
 .sheet__title {
   padding: 0 0 22rpx;
-}
-.menu__item {
-  height: 92rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1rpx solid #eee2da;
-  font-size: 29rpx;
-  color: #2f2f2f;
-}
-.danger {
-  color: #e05a45;
-}
-.input {
-  height: 86rpx;
-  padding: 0 22rpx;
-  border: 2rpx solid #ffe4d2;
-  border-radius: 20rpx;
-  background: #fff;
-}
-.submit {
-  height: 86rpx;
-  margin-top: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999rpx;
-  background: linear-gradient(90deg, #ff8a55, #ff8f9d);
-  color: #fff;
-  font-weight: 600;
 }
 .tabs {
   display: flex;

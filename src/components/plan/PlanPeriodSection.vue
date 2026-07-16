@@ -13,7 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   add: []
-  edit: []
+  remove: [itemId: string]
 }>()
 
 const hasItems = computed(() => props.items.length > 0)
@@ -23,17 +23,17 @@ const hasItems = computed(() => props.items.length > 0)
   <view class="section">
     <view class="section__head">
       <text class="section__title">{{ PERIOD_LABELS[period] }}</text>
-      <text
-        v-if="!readonly"
-        class="section__action"
-        @tap="hasItems ? emit('edit') : emit('add')"
-      >
-        {{ hasItems ? '修改' : '＋ 添加安排' }}
-      </text>
+      <text v-if="!readonly" class="section__action" @tap="emit('add')">＋ 添加安排</text>
     </view>
 
     <view v-if="hasItems" class="section__list">
-      <PlanItemCard v-for="item in items" :key="item.id" :item="item" />
+      <PlanItemCard
+        v-for="item in items"
+        :key="item.id"
+        :item="item"
+        :readonly="readonly"
+        @remove="emit('remove', $event)"
+      />
     </view>
 
     <view v-else-if="readonly" class="section__readonly-empty">
@@ -80,5 +80,10 @@ const hasItems = computed(() => props.items.length > 0)
   gap: 16rpx;
 }
 
-.section__readonly-empty { padding: 24rpx 4rpx; border-bottom: 2rpx dashed #ded5ce; font-size: 24rpx; color: #aaa; }
+.section__readonly-empty {
+  padding: 24rpx 4rpx;
+  border-bottom: 2rpx dashed #ded5ce;
+  font-size: 24rpx;
+  color: #aaa;
+}
 </style>
