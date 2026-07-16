@@ -8,6 +8,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  agreed: []
 }>()
 
 const instance = getCurrentInstance()
@@ -17,19 +18,32 @@ const nopeReady = ref(false)
 const rejectCount = ref(0)
 const showBirthdayPrompt = ref(false)
 const showRewardPrompt = ref(false)
+const showRejectTip = ref(false)
+const rejectMessage = ref('')
 const birthday = ref('')
 const birthdayError = ref('')
 const rewardMessage = ref('')
+const rewardName = ref('')
 let tabBarHidden = false
+let rejectTipTimer: ReturnType<typeof setTimeout> | undefined
 
 const PAD = 24
 const BIRTHDAY_LENGTH = 4
+const REJECT_MESSAGES = [
+  '不要啊！还真点呐哈哈哈！',
+  '不是吧，你居然还点！再给你一次重新选择的机会～',
+  '不同意按钮都跑这么远了，你怎么还追呀！',
+  '都第四次了，还没发现正确答案是“同意”吗？',
+  '你也太执着了吧！再点下去可要触发隐藏关卡啦！',
+  '宝藏就在前方',
+]
 
 function close() {
   emit('update:modelValue', false)
 }
 
 function agree() {
+  emit('agreed')
   close()
   uni.showToast({
     title: '好耶！这就去看看～',
@@ -53,10 +67,12 @@ function confirmBirthday() {
 
   if (birthday.value === '1210') {
     rewardMessage.value =
-      '恭喜你！答对啦！奖励是我要说出，我眼中的你，在我眼中，你是一个温柔，乐观，开朗，阳光的女孩儿！也是最最最漂亮的！所以点击同意吧！！！'
+      '2001年12月10日，我想，那一定是初冬里格外温暖的一天。那天有一场很轻的雨，而你的降临，也悄悄温暖了这个世界。\n\n在我眼中，你是一个温柔、乐观而善良的女孩。你像阳光一样明朗，始终热爱生活；你开朗却不失细腻，自立又保有柔软，对这个世界怀着好奇，也从未停止认真思考。\n\n或许冬天从来不只是寒冷——因为从你来到这个世界的那一天起，初冬便有了温度，也有了一个温柔的名字：'
+    rewardName.value = '张洁雨。'
   } else if (birthday.value === '0308') {
     rewardMessage.value =
-      '你怎么填写了我的生日！！！你人也太好啦！！！凭此截图，找我领取奖励！！！你别装作没看见嗷！哈哈哈哈哈哈哈！'
+      '这么难藏的彩蛋都被你找到啦！真的太太太让我感动，一时竟有些语塞。\n\n希望你未来的每一天，都能明亮、自在、开开心心。也要感谢那个当初勇敢主动的自己！！！'
+    rewardName.value = ''
   } else {
     birthday.value = ''
     birthdayError.value = '不对哦，请重试～'
@@ -105,6 +121,16 @@ function measureAndPlace(random: boolean) {
 
 function runAway() {
   rejectCount.value += 1
+  const message = REJECT_MESSAGES[rejectCount.value - 1]
+  if (message) {
+    rejectMessage.value = message
+    showRejectTip.value = true
+    clearTimeout(rejectTipTimer)
+    rejectTipTimer = setTimeout(() => {
+      showRejectTip.value = false
+    }, 1800)
+  }
+
   if (rejectCount.value === 7) {
     nopeReady.value = false
     showBirthdayPrompt.value = true
@@ -146,9 +172,13 @@ watch(
     rejectCount.value = 0
     showBirthdayPrompt.value = false
     showRewardPrompt.value = false
+    showRejectTip.value = false
+    rejectMessage.value = ''
+    clearTimeout(rejectTipTimer)
     birthday.value = ''
     birthdayError.value = ''
     rewardMessage.value = ''
+    rewardName.value = ''
     hidePageTabBar()
     measureAndPlace(false)
   },
@@ -156,6 +186,7 @@ watch(
 )
 
 onUnmounted(() => {
+  clearTimeout(rejectTipTimer)
   restorePageTabBar()
 })
 </script>
@@ -171,7 +202,7 @@ onUnmounted(() => {
 
     <view v-if="!showBirthdayPrompt && !showRewardPrompt" class="invite-card" @tap.stop>
       <text class="invite-card__title">周日想跟我一块出去玩吗</text>
-      <text class="invite-card__hint">强烈推荐点同意哈哈哈！</text>
+      <text class="invite-card__hint">你看同意按钮那么大，不同意按钮那么小，肯定得点同意吧！</text>
       <view class="invite-yes" hover-class="invite-yes--hover" :hover-stay-time="100" @tap="agree">
         <text class="invite-yes__text">同意</text>
       </view>
@@ -185,6 +216,10 @@ onUnmounted(() => {
       @tap.stop="runAway"
     >
       <text class="invite-nope__text">不同意</text>
+    </view>
+
+    <view v-if="showRejectTip" class="reject-tip" @tap.stop>
+      <text class="reject-tip__text">{{ rejectMessage }}</text>
     </view>
 
     <view v-if="showBirthdayPrompt" class="birthday-card" @tap.stop>
@@ -225,7 +260,9 @@ onUnmounted(() => {
     </view>
 
     <view v-if="showRewardPrompt" class="reward-card" @tap.stop>
-      <text class="reward-card__text">{{ rewardMessage }}</text>
+      <text class="reward-card__text"
+        >{{ rewardMessage }}<text v-if="rewardName" class="reward-card__name">{{ rewardName }}</text></text
+      >
       <view
         class="reward-agree"
         hover-class="reward-agree--hover"
@@ -360,6 +397,41 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 
+.reject-tip {
+  position: fixed;
+  top: 18%;
+  left: 50%;
+  z-index: 4;
+  max-width: calc(100vw - 96rpx);
+  padding: 20rpx 28rpx;
+  border-radius: 20rpx;
+  background: rgba(47, 47, 47, 0.9);
+  box-shadow: 0 12rpx 30rpx rgba(32, 24, 20, 0.24);
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  animation: reject-tip-pop 180ms ease-out;
+}
+
+.reject-tip__text {
+  display: block;
+  color: #fff;
+  font-size: 27rpx;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@keyframes reject-tip-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12rpx) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
 .birthday-card {
   position: relative;
   z-index: 3;
@@ -489,6 +561,10 @@ onUnmounted(() => {
   color: #2f2f2f;
   line-height: 1.75;
   text-align: left;
+}
+
+.reward-card__name {
+  font-weight: 800;
 }
 
 .reward-agree {

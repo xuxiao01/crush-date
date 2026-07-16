@@ -11,6 +11,7 @@ import hotpotImage from '@/assets/素材-透明火锅.png'
 import castleImage from '@/assets/素材-透明摩天轮城堡.png'
 import { useFoodsStore } from '@/stores/foods'
 import { usePlacesStore } from '@/stores/places'
+import { getStorage, setStorage } from '@/utils/storage'
 
 const foodsStore = useFoodsStore()
 const placesStore = usePlacesStore()
@@ -26,12 +27,17 @@ const SHEET_ACTIONS = [
 const currentCity = ref('北京')
 const showCitySheet = ref(false)
 const showInvite = ref(false)
+const INVITE_AGREED_STORAGE_KEY = 'crush_date_weekend_invite_agreed_v1'
 
 onShow(() => {
-  showInvite.value = true
+  showInvite.value = getStorage<boolean>(INVITE_AGREED_STORAGE_KEY) !== true
   void foodsStore.fetchFoods()
   void placesStore.fetchPlaces()
 })
+
+function handleInviteAgreed() {
+  setStorage(INVITE_AGREED_STORAGE_KEY, true)
+}
 
 function handleCitySwitch() {
   showCitySheet.value = true
@@ -95,7 +101,7 @@ function onCitySelect({ item }: { item: { name: string }; index: number }) {
     />
   </BasePage>
 
-  <WeekendInviteModal v-model="showInvite" />
+  <WeekendInviteModal v-model="showInvite" @agreed="handleInviteAgreed" />
 </template>
 
 <style lang="scss" scoped>
