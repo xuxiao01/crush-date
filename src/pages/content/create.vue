@@ -14,6 +14,8 @@ const name = ref('')
 const type = ref('')
 const comment = ref('')
 const image = ref('')
+const cropSource = ref('')
+const showCropper = ref(false)
 const saving = ref(false)
 
 const foodsStore = useFoodsStore()
@@ -57,9 +59,21 @@ function chooseCover() {
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: (result) => {
-      image.value = result.tempFilePaths[0] || ''
+      const source = result.tempFilePaths[0] || ''
+      if (!source) return
+      cropSource.value = source
+      showCropper.value = true
     },
   })
+}
+
+function confirmCrop(result: { tempFilePath: string }) {
+  if (result.tempFilePath) image.value = result.tempFilePath
+  cropSource.value = ''
+}
+
+function cancelCrop() {
+  cropSource.value = ''
 }
 
 function clearCover() {
@@ -144,7 +158,7 @@ async function submit() {
         <view v-else class="cover-picker" hover-class="cover-picker--hover" @tap="chooseCover">
           <view class="cover-picker__plus"><text>＋</text></view>
           <text class="cover-picker__title">选择一张图片</text>
-          <text class="cover-picker__hint">支持从相册选择或直接拍摄</text>
+          <text class="cover-picker__hint">支持相册或拍摄，选择后可按 4:3 裁剪</text>
         </view>
 
         <text class="upload-tip">提交时会自动上传图片，支持 JPG、PNG、WebP，最大 5MB。</text>
@@ -202,6 +216,19 @@ async function submit() {
         {{ saving ? '正在保存…' : copy.submit }}
       </button>
     </view>
+
+    <wd-img-cropper
+      v-model="showCropper"
+      :img-src="cropSource"
+      aspect-ratio="4:3"
+      file-type="jpg"
+      :quality="0.9"
+      :export-scale="2"
+      cancel-button-text="取消"
+      confirm-button-text="确认"
+      @cancel="cancelCrop"
+      @confirm="confirmCrop"
+    />
   </BasePage>
 </template>
 

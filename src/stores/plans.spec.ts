@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { completePlan, createPlan, getPlans, updatePlan } from '@/api/plans'
+import { ApiError } from '@/api/index'
+import { createPlan, deletePlan, getPlans, updatePlan, updatePlanStatus } from '@/api/plans'
 import { migrateLegacyPlans, usePlansStore } from '@/stores/plans'
 import type { Plan } from '@/types/plan'
 import { toPlanDateString } from '@/utils/planDate'
 
 vi.mock('@/api/plans', () => ({
-  activatePlan: vi.fn(),
-  completePlan: vi.fn(),
   createPlan: vi.fn(),
   deletePlan: vi.fn(),
   getPlans: vi.fn(),
@@ -21,6 +20,7 @@ vi.mock('@/api/plans', () => ({
     order: item.order,
   }),
   updatePlan: vi.fn(),
+  updatePlanStatus: vi.fn(),
 }))
 
 function makePlan(overrides: Partial<Plan> = {}): Plan {
@@ -169,23 +169,133 @@ describe('plan API integration', () => {
     ).toMatchObject({ ok: false, reason: 'duplicate' })
   })
 
-  it('replaces the active plan with the completed response', async () => {
+  it('moves the same backup plan into the active group and refreshes the list', async () => {
+    const backup = makePlan({ id: 'backup-1', status: 'backup', date: null })
+    const active = makePlan({
+      ...backup,
+      status: 'active',
+      date: toPlanDateString(),
+    })
+    vi.mocked(getPlans)
+      .mockResolvedValueOnce({
+        activePlan: null,
+        backupPlans: [backup],
+        completedPlans: [],
+      })
+      .mockResolvedValueOnce({
+        activePlan: active,
+        backupPlans: [],
+        completedPlans: [],
+      })
+    vi.mocked(updatePlanStatus).mockResolvedValue(active)
+
+    const store = usePlansStore()
+    await store.hydrate()
+    expect(await store.activateBackup(backup.id, active.date || '')).toEqual({
+      ok: true,
+      plan: active,
+    })
+    expect(updatePlanStatus).toHaveBeenCalledWith(backup.id, {
+      status: 'active',
+      date: active.date,
+    })
+    expect(store.activePlan?.id).toBe(backup.id)
+    expect(store.backupPlans).toHaveLength(0)
+  })
+
+  it('returns the backend status-transition message without replacing it', async () => {
+    const backup = makePlan({ id: 'backup-1', status: 'backup', date: null })
+    vi.mocked(getPlans).mockResolvedValue({
+      activePlan: null,
+      backupPlans: [backup],
+      completedPlans: [],
+    })
+    vi.mocked(updatePlanStatus).mockRejectedValue(new ApiError('该计划刚刚被其他设备修改', 409))
+
+    const store = usePlansStore()
+    await store.hydrate()
+    expect(await store.activateBackup(backup.id, toPlanDateString())).toEqual({
+      ok: false,
+      reason: 'invalid_status',
+      message: '该计划刚刚被其他设备修改',
+    })
+  })
+
+  it('returns the same active plan to backup without sending a date', async () => {
+    const active = makePlan()
+    const backup = makePlan({
+      ...active,
+      status: 'backup',
+      date: null,
+      completedAt: null,
+      sourceBackupId: null,
+    })
+    vi.mocked(getPlans)
+      .mockResolvedValueOnce({
+        activePlan: active,
+        backupPlans: [],
+        completedPlans: [],
+      })
+      .mockResolvedValueOnce({
+        activePlan: null,
+        backupPlans: [backup],
+        completedPlans: [],
+      })
+    vi.mocked(updatePlanStatus).mockResolvedValue(backup)
+
+    const store = usePlansStore()
+    await store.hydrate()
+    expect(await store.returnActiveToBackup(active.id)).toEqual({ ok: true, plan: backup })
+    expect(updatePlanStatus).toHaveBeenCalledWith(active.id, { status: 'backup' })
+    expect(store.activePlan).toBeUndefined()
+    expect(store.backupPlans[0]?.id).toBe(active.id)
+  })
+
+  it('moves the same active plan into the completed group and refreshes the list', async () => {
     const active = makePlan()
     const completed = makePlan({
       status: 'completed',
       completedAt: '2026-07-15T12:00:00.000Z',
     })
-    vi.mocked(getPlans).mockResolvedValue({
-      activePlan: active,
-      backupPlans: [],
-      completedPlans: [],
-    })
-    vi.mocked(completePlan).mockResolvedValue(completed)
+    vi.mocked(getPlans)
+      .mockResolvedValueOnce({
+        activePlan: active,
+        backupPlans: [],
+        completedPlans: [],
+      })
+      .mockResolvedValueOnce({
+        activePlan: null,
+        backupPlans: [],
+        completedPlans: [completed],
+      })
+    vi.mocked(updatePlanStatus).mockResolvedValue(completed)
 
     const store = usePlansStore()
     await store.hydrate()
     expect(await store.completeActive(active.id)).toEqual({ ok: true, plan: completed })
+    expect(updatePlanStatus).toHaveBeenCalledWith(active.id, { status: 'completed' })
     expect(store.activePlan).toBeUndefined()
     expect(store.completedPlans[0]).toEqual(completed)
+  })
+
+  it('deletes a completed plan and removes it from completed plans', async () => {
+    const completed = makePlan({
+      id: 'completed-1',
+      status: 'completed',
+      completedAt: '2026-07-15T12:00:00.000Z',
+    })
+    vi.mocked(getPlans).mockResolvedValue({
+      activePlan: null,
+      backupPlans: [],
+      completedPlans: [completed],
+    })
+    vi.mocked(deletePlan).mockResolvedValue()
+
+    const store = usePlansStore()
+    await store.hydrate()
+
+    expect(await store.deletePlan(completed.id)).toEqual({ ok: true })
+    expect(deletePlan).toHaveBeenCalledWith(completed.id)
+    expect(store.completedPlans).toHaveLength(0)
   })
 })

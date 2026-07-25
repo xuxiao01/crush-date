@@ -27,7 +27,7 @@ export interface Plan {
   completedAt: string | null
   createdAt: string
   updatedAt?: string
-  /** Read-only memory photos for completed plans. Uploading is out of scope for now. */
+  /** Legacy photo URLs returned with a plan; featured photos are loaded from the photo endpoint. */
   memoryPhotos: string[]
 }
 

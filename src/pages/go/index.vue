@@ -206,6 +206,7 @@ function createPlace() {
 }
 
 .grid__item {
+  display: flex;
   width: calc((100% - 20rpx) / 2);
   min-width: 0;
 }

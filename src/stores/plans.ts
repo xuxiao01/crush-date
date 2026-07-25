@@ -1,14 +1,13 @@
 import { defineStore } from 'pinia'
 import { ApiError } from '@/api/index'
 import {
-  activatePlan,
-  completePlan,
   createPlan,
   deletePlan as deletePlanRequest,
   getPlans,
   replan,
   toPlanItemInput,
   updatePlan,
+  updatePlanStatus,
   type PlanItemInput,
 } from '@/api/plans'
 import type { Plan, PlanItem, PlanItemType, PlanPeriod, PlanScenario } from '@/types/plan'
@@ -46,7 +45,9 @@ type PlanMutationReason =
   | 'request_failed'
 
 export type PlanMutationResult =
-  { ok: true; plan: Plan } | { ok: false; reason: PlanMutationReason }
+  { ok: true; plan: Plan } | { ok: false; reason: PlanMutationReason; message?: string }
+
+export type DeletePlanResult = { ok: true } | { ok: false; message: string }
 
 type PlanItemMutationResult =
   { ok: true; plan: Plan; item?: PlanItem } | { ok: false; reason: PlanMutationReason }
@@ -103,6 +104,20 @@ function failureReason(error: unknown, fallback: PlanMutationReason = 'request_f
   if (error instanceof ApiError && error.statusCode === 409) return 'active_exists' as const
   if (error instanceof ApiError && error.statusCode === 404) return 'not_found' as const
   return fallback
+}
+
+function statusFailure(error: unknown): Extract<PlanMutationResult, { ok: false }> {
+  let reason: PlanMutationReason = 'request_failed'
+  if (error instanceof ApiError) {
+    if (error.statusCode === 400) reason = 'invalid_date'
+    else if (error.statusCode === 404) reason = 'not_found'
+    else if (error.statusCode === 409) reason = 'invalid_status'
+  }
+  return {
+    ok: false,
+    reason,
+    message: error instanceof Error ? error.message : '请求失败，请稍后重试',
+  }
 }
 
 export const usePlansStore = defineStore('plans', {
@@ -214,17 +229,40 @@ export const usePlansStore = defineStore('plans', {
       }
     },
     async activateBackup(planId: string, date: string): Promise<PlanMutationResult> {
-      if (this.activePlan) return { ok: false, reason: 'active_exists' }
-      if (!validActiveDate(date)) return { ok: false, reason: 'invalid_date' }
+      if (!validActiveDate(date)) {
+        return { ok: false, reason: 'invalid_date', message: '请选择今天或之后的日期' }
+      }
       const source = this.getById(planId)
-      if (!source) return { ok: false, reason: 'not_found' }
-      if (source.status !== 'backup') return { ok: false, reason: 'invalid_status' }
+      if (!source) return { ok: false, reason: 'not_found', message: '计划不存在' }
+      if (source.status !== 'backup') {
+        return { ok: false, reason: 'invalid_status', message: '当前计划不能设为本次计划' }
+      }
       try {
-        const plan = await activatePlan(planId, date)
+        const plan = await updatePlanStatus(planId, { status: 'active', date })
         this.replacePlan(plan)
-        return { ok: true, plan }
+        await this.hydrate(true)
+        return { ok: true, plan: this.getById(plan.id) || plan }
       } catch (error) {
-        return { ok: false, reason: failureReason(error) }
+        const failure = statusFailure(error)
+        if (error instanceof ApiError && error.statusCode === 409 && this.activePlan) {
+          return { ...failure, reason: 'active_exists' }
+        }
+        return failure
+      }
+    },
+    async returnActiveToBackup(planId: string): Promise<PlanMutationResult> {
+      const current = this.getById(planId)
+      if (!current) return { ok: false, reason: 'not_found', message: '计划不存在' }
+      if (current.status !== 'active') {
+        return { ok: false, reason: 'invalid_status', message: '当前计划不能放回备用计划' }
+      }
+      try {
+        const plan = await updatePlanStatus(planId, { status: 'backup' })
+        this.replacePlan(plan)
+        await this.hydrate(true)
+        return { ok: true, plan: this.getById(plan.id) || plan }
+      } catch (error) {
+        return statusFailure(error)
       }
     },
     async replanCompleted(planId: string, date: string): Promise<PlanMutationResult> {
@@ -243,27 +281,31 @@ export const usePlansStore = defineStore('plans', {
     },
     async completeActive(planId: string): Promise<PlanMutationResult> {
       const current = this.getById(planId)
-      if (!current) return { ok: false, reason: 'not_found' }
+      if (!current) return { ok: false, reason: 'not_found', message: '计划不存在' }
       if (current.status !== 'active' || !current.date) {
-        return { ok: false, reason: 'invalid_status' }
+        return { ok: false, reason: 'invalid_status', message: '当前计划不能标记为完成' }
       }
       try {
-        const plan = await completePlan(planId)
+        const plan = await updatePlanStatus(planId, { status: 'completed' })
         this.replacePlan(plan)
-        return { ok: true, plan }
+        await this.hydrate(true)
+        return { ok: true, plan: this.getById(plan.id) || plan }
       } catch (error) {
-        return { ok: false, reason: failureReason(error, 'invalid_status') }
+        return statusFailure(error)
       }
     },
-    async deletePlan(planId: string) {
+    async deletePlan(planId: string): Promise<DeletePlanResult> {
       const current = this.getById(planId)
-      if (!current || current.status === 'completed') return false
+      if (!current) return { ok: false, message: '计划不存在' }
       try {
         await deletePlanRequest(planId)
         this.list = this.list.filter((plan) => plan.id !== planId)
-        return true
-      } catch {
-        return false
+        return { ok: true }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : '删除失败，请稍后重试',
+        }
       }
     },
     async updatePlanNote(planId: string, note: string) {

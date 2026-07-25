@@ -22,14 +22,31 @@ function backToList() {
 }
 async function deletePlan() {
   if (!plan.value) return
-  if (!(await plansStore.deletePlan(plan.value.id))) return
+  const result = await plansStore.deletePlan(plan.value.id)
+  if (!result.ok) {
+    uni.showToast({ title: result.message, icon: 'none' })
+    return
+  }
   showMenu.value = false
   backToList()
 }
 async function completePlan() {
   if (!plan.value) return
   const result = await plansStore.completeActive(plan.value.id)
-  if (!result.ok) return
+  if (!result.ok) {
+    uni.showToast({ title: result.message || '完成计划失败', icon: 'none' })
+    return
+  }
+  backToList()
+}
+async function returnToBackup() {
+  if (!plan.value) return
+  showMenu.value = false
+  const result = await plansStore.returnActiveToBackup(plan.value.id)
+  if (!result.ok) {
+    uni.showToast({ title: result.message || '放回备用计划失败', icon: 'none' })
+    return
+  }
   backToList()
 }
 </script>
@@ -51,6 +68,7 @@ async function completePlan() {
     >
     <view v-if="showMenu" class="mask" @tap="showMenu = false"
       ><view class="menu" @tap.stop
+        ><view class="menu__item" @tap="returnToBackup"><text>放回备用计划</text></view
         ><view class="menu__item" @tap="deletePlan"><text class="danger">删除计划</text></view
         ><view class="menu__item" @tap="showMenu = false"><text>取消</text></view></view
       ></view

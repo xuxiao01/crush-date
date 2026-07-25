@@ -7,6 +7,7 @@ interface RequestOptions {
   method?: HttpMethod
   data?: unknown
   header?: Record<string, string>
+  showError?: boolean
 }
 
 interface ErrorResponse {
@@ -31,7 +32,7 @@ function showRequestError(message = '请求失败'): void {
 }
 
 export function request<T>(options: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, header } = options
+  const { url, method = 'GET', data, header, showError = true } = options
 
   return new Promise((resolve, reject) => {
     uni.request({
@@ -49,11 +50,11 @@ export function request<T>(options: RequestOptions): Promise<T> {
 
         const data = response.data as ErrorResponse | undefined
         const message = data?.message || `请求失败（${statusCode}）`
-        showRequestError(message)
+        if (showError) showRequestError(message)
         reject(new ApiError(message, statusCode))
       },
       fail: (error) => {
-        showRequestError()
+        if (showError) showRequestError()
         reject(error)
       },
     })

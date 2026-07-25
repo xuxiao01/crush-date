@@ -45,14 +45,22 @@ function goDetail() {
         <text class="place-card__comment">{{ item.comment }}</text>
       </view>
 
-      <text v-if="item.status === 'visited'" class="place-card__date">{{ item.visitedDate }}</text>
+      <text
+        class="place-card__date"
+        :class="{ 'place-card__date--placeholder': item.status !== 'visited' }"
+      >
+        {{ item.status === 'visited' ? item.visitedDate : '\u00A0' }}
+      </text>
     </view>
   </view>
 </template>
 
 <style lang="scss" scoped>
 .place-card {
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  height: 490rpx;
   overflow: hidden;
   border-radius: 24rpx;
   background: #ffffff;
@@ -77,6 +85,7 @@ function goDetail() {
 .place-card__cover {
   position: relative;
   width: 100%;
+  flex-shrink: 0;
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 22rpx 22rpx 0 0;
@@ -134,23 +143,25 @@ function goDetail() {
 
 .place-card__body {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 10rpx;
-  padding: 20rpx 18rpx 22rpx;
+  min-height: 0;
+  padding: 24rpx 18rpx 12rpx;
+  box-sizing: border-box;
 }
 
 .place-card__name {
   font-size: 30rpx;
   font-weight: 700;
   color: #252525;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  line-height: 1.25;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .place-card__type {
+  margin-top: 8rpx;
   font-size: 22rpx;
   font-weight: 400;
   color: #999999;
@@ -164,10 +175,13 @@ function goDetail() {
   display: flex;
   align-items: flex-start;
   gap: 6rpx;
-  margin-top: 4rpx;
-  padding: 14rpx 14rpx 14rpx 12rpx;
+  min-height: 88rpx;
+  flex-shrink: 0;
+  margin-top: 18rpx;
+  padding: 10rpx 14rpx 10rpx 12rpx;
   border-radius: 16rpx;
   background: linear-gradient(135deg, #fff4eb 0%, #ffe8ef 100%);
+  box-sizing: border-box;
 }
 
 .place-card__quote-mark {
@@ -193,10 +207,17 @@ function goDetail() {
 }
 
 .place-card__date {
-  margin-top: 2rpx;
+  margin-top: 8rpx;
   font-size: 20rpx;
   font-weight: 400;
   color: #b5a49a;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.place-card__date--placeholder {
+  visibility: hidden;
 }
 </style>

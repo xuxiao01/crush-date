@@ -15,6 +15,7 @@ const showEdit = ref(false)
 const showDate = ref(false)
 const showMenu = ref(false)
 const showConflictDialog = ref(false)
+const conflictMessage = ref('请先完成或删除当前的本次计划。')
 const date = ref(toPlanDateString())
 const plan = computed(() => plansStore.getById(planId.value))
 
@@ -23,7 +24,8 @@ onLoad((query) => {
   planId.value = typeof query?.id === 'string' ? decodeURIComponent(query.id) : ''
 })
 
-function showConflict() {
+function showConflict(message = '请先完成或删除当前的本次计划。') {
+  conflictMessage.value = message
   showConflictDialog.value = true
 }
 function closeConflictDialog() {
@@ -37,10 +39,6 @@ function viewActivePlan() {
   }
 }
 function requestActivate() {
-  if (plansStore.activePlan) {
-    showConflict()
-    return
-  }
   date.value = toPlanDateString()
   showDate.value = true
 }
@@ -48,15 +46,19 @@ async function activate(value: string) {
   if (!plan.value) return
   const result = await plansStore.activateBackup(plan.value.id, value)
   if (!result.ok) {
-    if (result.reason === 'active_exists') showConflict()
-    else uni.showToast({ title: '设为本次计划失败', icon: 'none' })
+    if (result.reason === 'active_exists') showConflict(result.message)
+    else uni.showToast({ title: result.message || '设为本次计划失败', icon: 'none' })
     return
   }
   uni.switchTab({ url: '/pages/plan/index' })
 }
 async function deletePlan() {
   if (!plan.value) return
-  if (!(await plansStore.deletePlan(plan.value.id))) return
+  const result = await plansStore.deletePlan(plan.value.id)
+  if (!result.ok) {
+    uni.showToast({ title: result.message, icon: 'none' })
+    return
+  }
   uni.switchTab({ url: '/pages/plan/index' })
 }
 function openEdit() {
@@ -104,7 +106,7 @@ function saveBackupAndReturn() {
     <view v-if="showConflictDialog" class="conflict-mask" @tap="closeConflictDialog">
       <view class="conflict-dialog" @tap.stop>
         <text class="conflict-dialog__title">已有本次计划</text>
-        <text class="conflict-dialog__desc">请先完成或删除当前的本次计划。</text>
+        <text class="conflict-dialog__desc">{{ conflictMessage }}</text>
         <view class="conflict-dialog__actions">
           <view
             class="conflict-dialog__button conflict-dialog__button--secondary"
