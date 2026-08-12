@@ -12,7 +12,7 @@ import {
 } from '@/api/plans'
 import type { Plan, PlanItem, PlanItemType, PlanPeriod, PlanScenario } from '@/types/plan'
 import { PERIOD_ORDER } from '@/types/plan'
-import { isPastDate, toPlanDateString } from '@/utils/planDate'
+import { isSelectablePlanDate, toPlanDateString } from '@/utils/planDate'
 
 interface LegacyPlanItem extends PlanItem {
   address?: string
@@ -50,7 +50,8 @@ export type PlanMutationResult =
 export type DeletePlanResult = { ok: true } | { ok: false; message: string }
 
 type PlanItemMutationResult =
-  { ok: true; plan: Plan; item?: PlanItem } | { ok: false; reason: PlanMutationReason }
+  | { ok: true; plan: Plan; item?: PlanItem }
+  | { ok: false; reason: PlanMutationReason; message?: string }
 
 function stripLegacyItem(item: LegacyPlanItem): PlanItem {
   return {
@@ -97,13 +98,18 @@ function sortCompleted(a: Plan, b: Plan) {
 }
 
 function validActiveDate(date: string) {
-  return Boolean(date) && !isPastDate(date)
+  return isSelectablePlanDate(date)
 }
 
 function failureReason(error: unknown, fallback: PlanMutationReason = 'request_failed') {
+  if (error instanceof ApiError && error.statusCode === 400) return 'invalid_date' as const
   if (error instanceof ApiError && error.statusCode === 409) return 'active_exists' as const
   if (error instanceof ApiError && error.statusCode === 404) return 'not_found' as const
   return fallback
+}
+
+function failureMessage(error: unknown) {
+  return error instanceof Error ? error.message : '请求失败，请稍后重试'
 }
 
 function statusFailure(error: unknown): Extract<PlanMutationResult, { ok: false }> {
@@ -165,7 +171,9 @@ export const usePlansStore = defineStore('plans', {
     },
     async createActive(payload: { date: string; note?: string }): Promise<PlanMutationResult> {
       if (this.activePlan) return { ok: false, reason: 'active_exists' }
-      if (!validActiveDate(payload.date)) return { ok: false, reason: 'invalid_date' }
+      if (!validActiveDate(payload.date)) {
+        return { ok: false, reason: 'invalid_date', message: 'date 不能早于 14 天前' }
+      }
       try {
         const plan = await createPlan({
           title: '本次计划',
@@ -179,7 +187,7 @@ export const usePlansStore = defineStore('plans', {
         this.replacePlan(plan)
         return { ok: true, plan }
       } catch (error) {
-        return { ok: false, reason: failureReason(error) }
+        return { ok: false, reason: failureReason(error), message: failureMessage(error) }
       }
     },
     async createBackup(payload: {
@@ -230,7 +238,7 @@ export const usePlansStore = defineStore('plans', {
     },
     async activateBackup(planId: string, date: string): Promise<PlanMutationResult> {
       if (!validActiveDate(date)) {
-        return { ok: false, reason: 'invalid_date', message: '请选择今天或之后的日期' }
+        return { ok: false, reason: 'invalid_date', message: 'date 不能早于 14 天前' }
       }
       const source = this.getById(planId)
       if (!source) return { ok: false, reason: 'not_found', message: '计划不存在' }
@@ -267,7 +275,9 @@ export const usePlansStore = defineStore('plans', {
     },
     async replanCompleted(planId: string, date: string): Promise<PlanMutationResult> {
       if (this.activePlan) return { ok: false, reason: 'active_exists' }
-      if (!validActiveDate(date)) return { ok: false, reason: 'invalid_date' }
+      if (!validActiveDate(date)) {
+        return { ok: false, reason: 'invalid_date', message: 'date 不能早于 14 天前' }
+      }
       const source = this.getById(planId)
       if (!source) return { ok: false, reason: 'not_found' }
       if (source.status !== 'completed') return { ok: false, reason: 'invalid_status' }
@@ -276,7 +286,7 @@ export const usePlansStore = defineStore('plans', {
         this.replacePlan(plan)
         return { ok: true, plan }
       } catch (error) {
-        return { ok: false, reason: failureReason(error) }
+        return { ok: false, reason: failureReason(error), message: failureMessage(error) }
       }
     },
     async completeActive(planId: string): Promise<PlanMutationResult> {
@@ -320,12 +330,15 @@ export const usePlansStore = defineStore('plans', {
       }
     },
     async replaceItems(planId: string, items: PlanItemInput[]): Promise<PlanItemMutationResult> {
+      const current = this.getById(planId)
+      if (!current) return { ok: false, reason: 'not_found' }
+      if (current.status === 'completed') return { ok: false, reason: 'readonly' }
       try {
         const plan = await updatePlan(planId, { items })
         this.replacePlan(plan)
         return { ok: true, plan }
       } catch (error) {
-        return { ok: false, reason: failureReason(error) }
+        return { ok: false, reason: failureReason(error), message: failureMessage(error) }
       }
     },
     async addItemToPlan(

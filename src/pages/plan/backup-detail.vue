@@ -7,7 +7,7 @@ import BackupPlanSheet from '@/components/plan/BackupPlanSheet.vue'
 import DatePickerSheet from '@/components/plan/DatePickerSheet.vue'
 import PlanScheduleEditor from '@/components/plan/PlanScheduleEditor.vue'
 import { usePlansStore } from '@/stores/plans'
-import { toPlanDateString } from '@/utils/planDate'
+import { getEarliestSelectablePlanDate, toPlanDateString } from '@/utils/planDate'
 
 const plansStore = usePlansStore()
 const planId = ref('')
@@ -98,7 +98,7 @@ function saveBackupAndReturn() {
     <DatePickerSheet
       v-model="showDate"
       :value="date"
-      :min-date="toPlanDateString()"
+      :min-date="getEarliestSelectablePlanDate()"
       title="什么时候出发？"
       confirm-text="设为本次计划"
       @confirm="activate"

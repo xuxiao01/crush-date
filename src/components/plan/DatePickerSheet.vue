@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { parsePlanDate, toPlanDateString } from '@/utils/planDate'
+import { getEarliestSelectablePlanDate, parsePlanDate, toPlanDateString } from '@/utils/planDate'
 
 const props = withDefaults(
   defineProps<{
@@ -26,19 +26,22 @@ const WEEK = ['日', '一', '二', '三', '四', '五', '六']
 
 const cursor = ref(new Date())
 const selected = ref(toPlanDateString())
+const earliestDate = computed(() => props.minDate || getEarliestSelectablePlanDate())
+
+function normalizeSelectedDate(date: string): string {
+  return date && date >= earliestDate.value ? date : earliestDate.value
+}
 
 watch(
   () => props.modelValue,
   (open) => {
     if (!open) return
-    selected.value = props.value || toPlanDateString()
+    selected.value = normalizeSelectedDate(props.value || toPlanDateString())
     cursor.value = parsePlanDate(selected.value)
   },
 )
 
-const monthLabel = computed(
-  () => `${cursor.value.getFullYear()}年${cursor.value.getMonth() + 1}月`,
-)
+const monthLabel = computed(() => `${cursor.value.getFullYear()}年${cursor.value.getMonth() + 1}月`)
 
 const cells = computed(() => {
   const y = cursor.value.getFullYear()
@@ -53,7 +56,12 @@ const cells = computed(() => {
   }
   for (let d = 1; d <= daysInMonth; d += 1) {
     const date = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    list.push({ key: date, label: String(d), date, muted: Boolean(props.minDate && date < props.minDate) })
+    list.push({
+      key: date,
+      label: String(d),
+      date,
+      muted: date < earliestDate.value,
+    })
   }
   return list
 })
@@ -68,7 +76,7 @@ function nextMonth() {
 
 function pick(date?: string) {
   if (!date) return
-  if (props.minDate && date < props.minDate) return
+  if (date < earliestDate.value) return
   selected.value = date
 }
 
@@ -77,7 +85,7 @@ function close() {
 }
 
 function confirm() {
-  emit('confirm', selected.value)
+  emit('confirm', normalizeSelectedDate(selected.value))
   close()
 }
 </script>

@@ -60,7 +60,11 @@ function goDetail() {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 490rpx;
+  height: 480rpx;
+  min-width: 0;
+  min-height: 480rpx;
+  max-width: 100%;
+  max-height: 480rpx;
   overflow: hidden;
   border-radius: 24rpx;
   background: #ffffff;
@@ -85,17 +89,21 @@ function goDetail() {
 .place-card__cover {
   position: relative;
   width: 100%;
+  height: 0;
+  padding-top: 75%;
   flex-shrink: 0;
-  aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 22rpx 22rpx 0 0;
   background: #f5ebe3;
+  box-sizing: border-box;
 }
 
 .place-card__image {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
 }
 
 .place-card--unvisited .place-card__image {
@@ -146,11 +154,15 @@ function goDetail() {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: 24rpx 18rpx 12rpx;
+  overflow: hidden;
+  padding: 16rpx 18rpx 10rpx;
   box-sizing: border-box;
 }
 
 .place-card__name {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
   font-size: 30rpx;
   font-weight: 700;
   color: #252525;
@@ -161,7 +173,10 @@ function goDetail() {
 }
 
 .place-card__type {
-  margin-top: 8rpx;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: 4rpx;
   font-size: 22rpx;
   font-weight: 400;
   color: #999999;
@@ -173,12 +188,14 @@ function goDetail() {
 
 .place-card__quote {
   display: flex;
+  flex: 0 0 80rpx;
   align-items: flex-start;
   gap: 6rpx;
-  min-height: 88rpx;
-  flex-shrink: 0;
-  margin-top: 18rpx;
-  padding: 10rpx 14rpx 10rpx 12rpx;
+  height: 80rpx;
+  min-height: 80rpx;
+  max-height: 80rpx;
+  margin-top: 10rpx;
+  padding: 8rpx 14rpx 8rpx 12rpx;
   border-radius: 16rpx;
   background: linear-gradient(135deg, #fff4eb 0%, #ffe8ef 100%);
   box-sizing: border-box;
@@ -207,7 +224,10 @@ function goDetail() {
 }
 
 .place-card__date {
-  margin-top: 8rpx;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: 4rpx;
   font-size: 20rpx;
   font-weight: 400;
   color: #b5a49a;

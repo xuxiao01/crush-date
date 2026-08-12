@@ -56,7 +56,11 @@ function createFood() {
         >
         <view class="grid">
           <view v-for="item in unvisitedList" :key="item.id" class="grid__item">
-            <FoodCollectCard :item="item" />
+            <FoodCollectCard
+              class="grid__card"
+              style="display: block; width: 100%; min-width: 0; max-width: 100%; height: 100%"
+              :item="item"
+            />
           </view>
         </view>
       </view>
@@ -65,7 +69,11 @@ function createFood() {
         <text class="section__title section__title--visited">吃过啦 · {{ visitedCount }} 家</text>
         <view class="grid">
           <view v-for="item in visitedList" :key="item.id" class="grid__item">
-            <FoodCollectCard :item="item" />
+            <FoodCollectCard
+              class="grid__card"
+              style="display: block; width: 100%; min-width: 0; max-width: 100%; height: 100%"
+              :item="item"
+            />
           </view>
         </view>
       </view>
@@ -202,12 +210,35 @@ function createFood() {
 .grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 20rpx;
+  align-items: flex-start;
+  width: 100%;
 }
 
 .grid__item {
   display: flex;
-  width: calc((100% - 20rpx) / 2);
+  flex: 0 0 50%;
+  width: 50%;
+  height: 480rpx;
   min-width: 0;
+  max-width: 50%;
+  margin-bottom: 20rpx;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.grid__item:nth-child(odd) {
+  padding-right: 10rpx;
+}
+
+.grid__item:nth-child(even) {
+  padding-left: 10rpx;
+}
+
+.grid__card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
 }
 </style>

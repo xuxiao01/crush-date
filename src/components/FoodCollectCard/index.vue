@@ -64,7 +64,12 @@ function goDetail() {
   position: relative;
   width: 100%;
   height: 480rpx;
+  min-width: 0;
+  min-height: 480rpx;
+  max-width: 100%;
+  max-height: 480rpx;
   overflow: visible;
+  box-sizing: border-box;
   transition: transform 160ms ease;
 }
 
@@ -96,17 +101,21 @@ function goDetail() {
 .food-card__cover {
   position: relative;
   width: 100%;
+  height: 0;
+  padding-top: 75%;
   flex-shrink: 0;
-  aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 22rpx 22rpx 0 0;
   background: #f5ebe3;
+  box-sizing: border-box;
 }
 
 .food-card__image {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
 }
 
 .food-card--unvisited .food-card__image {
@@ -216,11 +225,15 @@ function goDetail() {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: 20rpx 18rpx 10rpx;
+  overflow: hidden;
+  padding: 16rpx 18rpx 10rpx;
   box-sizing: border-box;
 }
 
 .food-card__name {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
   font-size: 30rpx;
   font-weight: 700;
   color: #252525;
@@ -231,7 +244,10 @@ function goDetail() {
 }
 
 .food-card__type {
-  margin-top: 6rpx;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: 4rpx;
   font-size: 22rpx;
   font-weight: 400;
   color: #999999;
@@ -243,11 +259,13 @@ function goDetail() {
 
 .food-card__quote {
   display: flex;
+  flex: 0 0 80rpx;
   align-items: flex-start;
   gap: 6rpx;
-  min-height: 84rpx;
-  flex-shrink: 0;
-  margin-top: 12rpx;
+  height: 80rpx;
+  min-height: 80rpx;
+  max-height: 80rpx;
+  margin-top: 10rpx;
   padding: 8rpx 14rpx 8rpx 12rpx;
   border-radius: 16rpx;
   background: linear-gradient(135deg, #fff4eb 0%, #ffe8ef 100%);
@@ -277,7 +295,10 @@ function goDetail() {
 }
 
 .food-card__date {
-  margin-top: 6rpx;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: 4rpx;
   font-size: 20rpx;
   font-weight: 400;
   color: #b5a49a;

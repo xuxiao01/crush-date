@@ -4,12 +4,11 @@ import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
 import DatePickerSheet from '@/components/plan/DatePickerSheet.vue'
-import PlanPeriodSection from '@/components/plan/PlanPeriodSection.vue'
+import PlanRecordGallery from '@/components/plan/PlanRecordGallery.vue'
 import { deletePlanPhoto, getPlanPhotos, uploadPlanPhoto, type PlanPhoto } from '@/api/plans'
 import { usePlansStore } from '@/stores/plans'
-import type { PlanPeriod } from '@/types/plan'
-import { PERIOD_ORDER } from '@/types/plan'
-import { formatZhDate, toPlanDateString } from '@/utils/planDate'
+import { formatZhDate, getEarliestSelectablePlanDate, toPlanDateString } from '@/utils/planDate'
+import { deletePhotosSequentially } from '@/utils/planPhotos'
 
 const MAX_FEATURED_PHOTOS = 9
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024
@@ -36,18 +35,22 @@ const uploading = ref(false)
 const deleting = ref(false)
 const uploadCurrent = ref(0)
 const uploadTotal = ref(0)
-const deletingPhotoId = ref('')
+const isEditingPhotos = ref(false)
+const selectedPhotoIds = ref<Set<string>>(new Set())
+const deletingSelectedPhotos = ref(false)
+const deleteCurrent = ref(0)
+const deleteTotal = ref(0)
 const cropQueue = ref<string[]>([])
 const cropSource = ref('')
 const showCropper = ref(false)
 const uploadedBatchCount = ref(0)
 const plan = computed(() => plansStore.getById(planId.value))
 const featuredPhotoUrls = computed(() => featuredPhotos.value.map((photo) => photo.url))
+const selectedPhotoCount = computed(() => selectedPhotoIds.value.size)
 const processingPhotos = computed(
   () => uploading.value || showCropper.value || cropQueue.value.length > 0,
 )
 const uploadButtonText = computed(() => {
-  if (deletingPhotoId.value) return '正在删除…'
   if (uploading.value) return `正在上传第 ${uploadCurrent.value}/${uploadTotal.value} 张`
   if (processingPhotos.value) return `裁剪中 ${uploadCurrent.value}/${uploadTotal.value}`
   if (photosLoading.value || !photosReady.value) return '正在加载…'
@@ -55,6 +58,11 @@ const uploadButtonText = computed(() => {
   if (featuredPhotos.value.length >= MAX_FEATURED_PHOTOS) return '最多上传 9 张'
   return '＋ 上传精选图片'
 })
+const deleteButtonText = computed(() =>
+  deletingSelectedPhotos.value
+    ? `正在删除 ${deleteCurrent.value}/${deleteTotal.value}`
+    : `删除所选（${selectedPhotoCount.value}）`,
+)
 
 onLoad((query) => {
   planId.value = typeof query?.id === 'string' ? decodeURIComponent(query.id) : ''
@@ -73,6 +81,7 @@ async function initializeCompletedPlan() {
 
 async function loadFeaturedPhotos() {
   if (!planId.value || plan.value?.status !== 'completed' || photosLoading.value) return
+  resetPhotoEditing()
   photosLoading.value = true
   photoLoadError.value = ''
   try {
@@ -87,7 +96,8 @@ async function loadFeaturedPhotos() {
 
 function chooseFeaturedPhotos() {
   if (
-    deletingPhotoId.value ||
+    isEditingPhotos.value ||
+    deletingSelectedPhotos.value ||
     processingPhotos.value ||
     photosLoading.value ||
     !photosReady.value ||
@@ -271,38 +281,90 @@ function previewFeaturedPhoto(index: number) {
   })
 }
 
-function requestDeletePhoto(photo: PlanPhoto) {
-  if (deletingPhotoId.value || processingPhotos.value) return
-  uni.showModal({
-    title: '删除精选照片',
-    content: '删除后无法恢复，是否继续？',
-    confirmText: '删除',
-    confirmColor: '#d9534f',
-    success: (result) => {
-      if (result.confirm) void removePhoto(photo)
-    },
-  })
+function togglePhotoEditing() {
+  if (
+    deletingSelectedPhotos.value ||
+    processingPhotos.value ||
+    photosLoading.value ||
+    photoLoadError.value
+  ) {
+    return
+  }
+  if (isEditingPhotos.value) {
+    resetPhotoEditing()
+    return
+  }
+  if (!featuredPhotos.value.length) return
+  isEditingPhotos.value = true
 }
 
-async function removePhoto(photo: PlanPhoto) {
-  if (deletingPhotoId.value || plan.value?.status !== 'completed') return
-  deletingPhotoId.value = photo.id
-  try {
-    await deletePlanPhoto(plan.value.id, photo.id)
-    await loadFeaturedPhotos()
-    uni.showToast({ title: '精选照片已删除', icon: 'success' })
-  } catch (error) {
-    uni.showToast({
-      title: error instanceof Error ? error.message : '删除失败，请稍后重试',
-      icon: 'none',
-    })
-  } finally {
-    deletingPhotoId.value = ''
+function handlePhotoTap(photo: PlanPhoto, index: number) {
+  if (deletingSelectedPhotos.value) return
+  if (!isEditingPhotos.value) {
+    previewFeaturedPhoto(index)
+    return
   }
+
+  const nextSelection = new Set(selectedPhotoIds.value)
+  if (nextSelection.has(photo.id)) nextSelection.delete(photo.id)
+  else nextSelection.add(photo.id)
+  selectedPhotoIds.value = nextSelection
+}
+
+function resetPhotoEditing() {
+  isEditingPhotos.value = false
+  selectedPhotoIds.value = new Set()
+}
+
+async function deleteSelectedPhotos() {
+  if (
+    !plan.value ||
+    plan.value.status !== 'completed' ||
+    deletingSelectedPhotos.value ||
+    !selectedPhotoCount.value
+  ) {
+    return
+  }
+
+  const photoIds = featuredPhotos.value
+    .filter((photo) => selectedPhotoIds.value.has(photo.id))
+    .map((photo) => photo.id)
+
+  deletingSelectedPhotos.value = true
+  deleteCurrent.value = 0
+  deleteTotal.value = photoIds.length
+
+  const result = await deletePhotosSequentially(
+    photoIds,
+    (photoId) => deletePlanPhoto(plan.value!.id, photoId),
+    (current, total) => {
+      deleteCurrent.value = current
+      deleteTotal.value = total
+    },
+  )
+
+  await loadFeaturedPhotos()
+  deletingSelectedPhotos.value = false
+  deleteCurrent.value = 0
+  deleteTotal.value = 0
+
+  if (!result.failures.length) {
+    uni.showToast({
+      title: `已删除 ${result.deletedPhotoIds.length} 张`,
+      icon: 'success',
+    })
+    return
+  }
+
+  const firstError = result.failures[0]?.message || '删除失败，请稍后重试'
+  const summary = result.deletedPhotoIds.length
+    ? `已删除 ${result.deletedPhotoIds.length} 张，${result.failures.length} 张失败：${firstError}`
+    : firstError
+  uni.showToast({ title: summary, icon: 'none' })
 }
 
 function requestDeleteCompletedPlan() {
-  if (!plan.value || deleting.value) return
+  if (!plan.value || deleting.value || deletingSelectedPhotos.value) return
   showMenu.value = false
   uni.showModal({
     title: '删除过去计划',
@@ -335,18 +397,17 @@ function clearPhotoPageState() {
   photosReady.value = false
   photosLoading.value = false
   uploading.value = false
-  deletingPhotoId.value = ''
+  deletingSelectedPhotos.value = false
+  deleteCurrent.value = 0
+  deleteTotal.value = 0
+  resetPhotoEditing()
   showCropper.value = false
   resetPhotoBatch()
 }
 
-function itemsOf(period: PlanPeriod) {
-  return (
-    plan.value?.items
-      .filter((item) => item.period === period)
-      .slice()
-      .sort((a, b) => a.order - b.order) || []
-  )
+function openPlanMenu() {
+  if (deletingSelectedPhotos.value) return
+  showMenu.value = true
 }
 function showConflict() {
   const active = plansStore.activePlan
@@ -362,6 +423,7 @@ function showConflict() {
   })
 }
 function requestReplan() {
+  if (isEditingPhotos.value || deletingSelectedPhotos.value) return
   if (plansStore.activePlan) {
     showConflict()
     return
@@ -373,6 +435,7 @@ async function replan(value: string) {
   const result = await plansStore.replanCompleted(plan.value.id, value)
   if (!result.ok) {
     if (result.reason === 'active_exists') showConflict()
+    else uni.showToast({ title: result.message || '创建本次计划失败', icon: 'none' })
     return
   }
   uni.redirectTo({ url: `/pages/plan/detail?id=${encodeURIComponent(result.plan.id)}` })
@@ -383,7 +446,9 @@ async function replan(value: string) {
   <BasePage>
     <CustomNavbar title="那天的记录" :show-back="true" :large-hit="true">
       <template #right>
-        <view class="more" @tap="showMenu = true"><text>⋯</text></view>
+        <view class="more" :class="{ 'more--disabled': deletingSelectedPhotos }" @tap="openPlanMenu"
+          ><text>⋯</text></view
+        >
       </template>
     </CustomNavbar>
     <view v-if="plan?.status === 'completed'" class="detail">
@@ -391,36 +456,45 @@ async function replan(value: string) {
         ><text class="header__date">{{ formatZhDate(plan.date || '') }}</text
         ><text v-if="plan.note" class="header__note">{{ plan.note }}</text></view
       >
-      <view class="periods"
-        ><PlanPeriodSection
-          v-for="period in PERIOD_ORDER"
-          :key="period"
-          :period="period"
-          :items="itemsOf(period)"
-          readonly
-      /></view>
+      <PlanRecordGallery :items="plan.items" />
       <view class="memories">
         <view class="section-head">
           <view class="section-head__copy">
             <text class="section-title">精选照片 {{ featuredPhotos.length }}/9</text>
             <text class="section-subtitle">留下那天最喜欢的瞬间</text>
           </view>
-          <button
-            class="upload-button"
-            :disabled="
-              processingPhotos ||
-              Boolean(deletingPhotoId) ||
-              photosLoading ||
-              !photosReady ||
-              Boolean(photoLoadError) ||
-              featuredPhotos.length >= MAX_FEATURED_PHOTOS
-            "
-            @tap="chooseFeaturedPhotos"
-          >
-            {{ uploadButtonText }}
-          </button>
+          <view class="section-head__actions">
+            <button
+              v-if="featuredPhotos.length"
+              class="edit-button"
+              :disabled="
+                deletingSelectedPhotos ||
+                processingPhotos ||
+                photosLoading ||
+                Boolean(photoLoadError)
+              "
+              @tap="togglePhotoEditing"
+            >
+              {{ isEditingPhotos ? '取消' : '编辑' }}
+            </button>
+            <button
+              v-if="!isEditingPhotos"
+              class="upload-button"
+              :disabled="
+                deletingSelectedPhotos ||
+                processingPhotos ||
+                photosLoading ||
+                !photosReady ||
+                Boolean(photoLoadError) ||
+                featuredPhotos.length >= MAX_FEATURED_PHOTOS
+              "
+              @tap="chooseFeaturedPhotos"
+            >
+              {{ uploadButtonText }}
+            </button>
+          </view>
         </view>
-        <view v-if="featuredPhotos.length > 1" class="sort-placeholder">
+        <view v-if="featuredPhotos.length > 1 && !isEditingPhotos" class="sort-placeholder">
           <text>调整顺序（即将支持）</text>
         </view>
         <view v-if="photosLoading" class="photo-loading">
@@ -431,21 +505,30 @@ async function replan(value: string) {
           <button class="photo-error__retry" @tap="loadFeaturedPhotos">重新加载</button>
         </view>
         <view v-else-if="featuredPhotos.length" class="photos">
-          <view v-for="(photo, index) in featuredPhotos" :key="photo.id" class="photo-item">
-            <image
-              class="photo"
-              :src="photo.url"
-              mode="aspectFill"
-              @tap="previewFeaturedPhoto(index)"
-            />
-            <button
-              class="photo-delete"
-              :disabled="Boolean(deletingPhotoId) || processingPhotos"
-              @tap.stop="requestDeletePhoto(photo)"
+          <view
+            v-for="(photo, index) in featuredPhotos"
+            :key="photo.id"
+            class="photo-item"
+            :class="{ 'photo-item--selected': selectedPhotoIds.has(photo.id) }"
+            @tap="handlePhotoTap(photo, index)"
+          >
+            <image class="photo" :src="photo.url" mode="aspectFill" />
+            <view
+              v-if="isEditingPhotos"
+              class="photo-selector"
+              :class="{ 'photo-selector--selected': selectedPhotoIds.has(photo.id) }"
             >
-              {{ deletingPhotoId === photo.id ? '删除中…' : '删除' }}
-            </button>
+              <text v-if="selectedPhotoIds.has(photo.id)">✓</text>
+            </view>
           </view>
+          <button
+            v-if="isEditingPhotos"
+            class="bulk-delete-button"
+            :disabled="!selectedPhotoCount || deletingSelectedPhotos"
+            @tap="deleteSelectedPhotos"
+          >
+            {{ deleteButtonText }}
+          </button>
         </view>
         <view v-else-if="photosReady" class="photo-empty" @tap="chooseFeaturedPhotos">
           <text class="photo-empty__icon">＋</text>
@@ -455,7 +538,11 @@ async function replan(value: string) {
       </view>
     </view>
     <view v-else class="missing"><text>没有找到这条过去的计划</text></view>
-    <view v-if="plan?.status === 'completed' && !showCropper" class="footer"
+    <view
+      v-if="
+        plan?.status === 'completed' && !showCropper && !isEditingPhotos && !deletingSelectedPhotos
+      "
+      class="footer"
       ><view class="primary" @tap="requestReplan"><text>再计划一次</text></view></view
     >
     <view v-if="showMenu" class="mask" @tap="showMenu = false">
@@ -469,7 +556,7 @@ async function replan(value: string) {
     <DatePickerSheet
       v-model="showDate"
       :value="date"
-      :min-date="toPlanDateString()"
+      :min-date="getEarliestSelectablePlanDate()"
       title="什么时候再出发？"
       confirm-text="创建本次计划"
       @confirm="replan"
@@ -514,12 +601,6 @@ async function replan(value: string) {
   font-size: 26rpx;
   color: #81746c;
 }
-.periods {
-  display: flex;
-  flex-direction: column;
-  gap: 28rpx;
-  filter: saturate(0.72);
-}
 .memories {
   padding: 26rpx;
   border-radius: 24rpx;
@@ -538,6 +619,12 @@ async function replan(value: string) {
   flex-direction: column;
   gap: 5rpx;
 }
+.section-head__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
 .section-title {
   display: block;
   font-size: 29rpx;
@@ -548,7 +635,8 @@ async function replan(value: string) {
   font-size: 22rpx;
   color: #a09289;
 }
-.upload-button {
+.upload-button,
+.edit-button {
   flex-shrink: 0;
   height: 58rpx;
   margin: 0;
@@ -564,10 +652,19 @@ async function replan(value: string) {
   line-height: 1;
   color: #bd6b48;
 }
-.upload-button::after {
+.upload-button::after,
+.edit-button::after,
+.bulk-delete-button::after {
   border: 0;
 }
-.upload-button[disabled] {
+.edit-button {
+  padding: 0 18rpx;
+  border-color: #d8c4b7;
+  background: rgba(255, 253, 250, 0.78);
+  color: #806f65;
+}
+.upload-button[disabled],
+.edit-button[disabled] {
   border-color: #ddd1c8;
   background: #eee8e2;
   color: #aa9d94;
@@ -593,6 +690,14 @@ async function replan(value: string) {
 .photo-item {
   position: relative;
   width: 100%;
+  border-radius: 20rpx;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.photo-item--selected {
+  box-shadow: 0 0 0 4rpx rgba(214, 111, 88, 0.72);
+  transform: scale(0.992);
 }
 .photo {
   display: block;
@@ -603,29 +708,47 @@ async function replan(value: string) {
   box-sizing: border-box;
   background: #e8dfd7;
 }
-.photo-delete {
+.photo-selector {
   position: absolute;
   top: 18rpx;
   right: 18rpx;
   z-index: 2;
-  height: 54rpx;
-  margin: 0;
-  padding: 0 20rpx;
-  border: 2rpx solid rgba(177, 78, 58, 0.24);
-  border-radius: 999rpx;
-  background: rgba(255, 248, 244, 0.9);
-  backdrop-filter: blur(8rpx);
-  font-size: 21rpx;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 3rpx solid rgba(255, 248, 244, 0.96);
+  border-radius: 50%;
+  background: rgba(91, 78, 70, 0.3);
+  box-shadow: 0 2rpx 8rpx rgba(62, 39, 28, 0.2);
+  font-size: 28rpx;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+.photo-selector--selected {
+  border-color: #fff8f4;
+  background: #d66f58;
+}
+.bulk-delete-button {
+  width: 100%;
+  height: 82rpx;
+  margin: 6rpx 0 0;
+  border: 2rpx solid rgba(184, 79, 58, 0.34);
+  border-radius: 18rpx;
+  background: #b84f3a;
+  font-size: 27rpx;
   font-weight: 600;
-  line-height: 50rpx;
-  color: #b84f3a;
+  line-height: 78rpx;
+  color: #fff;
 }
-.photo-delete::after {
-  border: 0;
-}
-.photo-delete[disabled] {
-  color: #a89890;
-  opacity: 0.8;
+.bulk-delete-button[disabled] {
+  border-color: #ddd1c8;
+  background: #e7dfd9;
+  color: #aa9d94;
+  opacity: 1;
 }
 .photo-empty,
 .photo-loading,
@@ -722,6 +845,9 @@ async function replan(value: string) {
   align-items: center;
   justify-content: center;
   font-size: 28px;
+}
+.more--disabled {
+  opacity: 0.4;
 }
 .mask {
   position: fixed;
