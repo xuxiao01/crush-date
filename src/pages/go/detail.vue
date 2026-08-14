@@ -4,9 +4,12 @@ import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
 import AddPlanSheet from '@/components/plan/AddPlanSheet.vue'
-import { deleteContentItem } from '@/api/content'
+import { deleteContentItem, getPlaceById, updateContentItemVisited } from '@/api/content'
+import { ApiError } from '@/api/index'
 import { usePlacesStore } from '@/stores/places'
 import { usePlansStore } from '@/stores/plans'
+import type { PlaceContentItem } from '@/types/content'
+import { formatVisitedDate } from '@/utils/contentItem'
 
 const placesStore = usePlacesStore()
 const plansStore = usePlansStore()
@@ -15,33 +18,58 @@ const animating = ref(false)
 const showBadge = ref(false)
 const showAddPlan = ref(false)
 const deleting = ref(false)
+const loading = ref(true)
+const error = ref('')
+const notFound = ref(false)
+const place = ref<PlaceContentItem>()
 
-const place = computed(() => (placeId.value ? placesStore.getById(placeId.value) : undefined))
 const navTitle = computed(() => place.value?.name || '想去详情')
+const visitedDate = computed(() => formatVisitedDate(place.value?.visitedAt ?? null))
 
 onLoad((query) => {
   void plansStore.hydrate()
   placeId.value = typeof query?.id === 'string' ? decodeURIComponent(query.id) : ''
-  if (place.value?.status === 'visited') {
-    showBadge.value = true
-  }
+  void loadPlace()
 })
 
-async function handleMarkVisited() {
-  if (!place.value || place.value.status === 'visited' || animating.value) return
+async function loadPlace() {
+  loading.value = true
+  error.value = ''
+  notFound.value = false
+  if (!placeId.value) {
+    notFound.value = true
+    loading.value = false
+    return
+  }
+  try {
+    place.value = await getPlaceById(placeId.value, { showError: false })
+    showBadge.value = place.value.visited
+  } catch (loadError) {
+    if (loadError instanceof ApiError && loadError.statusCode === 404) notFound.value = true
+    else error.value = loadError instanceof Error ? loadError.message : '详情加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleVisitedChange() {
+  if (!place.value || animating.value) return
 
   animating.value = true
-  const ok = await placesStore.markVisited(place.value.id)
-  if (!ok) {
+  const nextVisited = !place.value.visited
+  try {
+    place.value = await updateContentItemVisited<PlaceContentItem>(place.value.id, nextVisited)
+    showBadge.value = place.value.visited
+    placesStore.removePlace(place.value.id)
+    placesStore.invalidate()
+    uni.showToast({ title: nextVisited ? '已标记为去过' : '已撤销去过', icon: 'success' })
+  } catch {
     animating.value = false
     return
   }
 
-  showBadge.value = true
-
   setTimeout(() => {
     animating.value = false
-    uni.navigateBack()
   }, 350)
 }
 
@@ -127,7 +155,11 @@ function onAddSuccess({
       </template>
     </CustomNavbar>
 
-    <view v-if="place" class="detail">
+    <view v-if="loading" class="empty">
+      <text class="empty__text">正在加载…</text>
+    </view>
+
+    <view v-else-if="place" class="detail">
       <view class="detail__cover-wrap">
         <image class="detail__cover" :src="place.image" mode="aspectFill" />
 
@@ -150,9 +182,9 @@ function onAddSuccess({
         </view>
 
         <view class="detail__status">
-          <template v-if="place.status === 'visited'">
+          <template v-if="place.visited">
             <text class="detail__status-label">去过了</text>
-            <text class="detail__status-date">{{ place.visitedDate }}</text>
+            <text class="detail__status-date">{{ visitedDate }}</text>
           </template>
           <template v-else>
             <text class="detail__status-label detail__status-label--pending">还没去</text>
@@ -163,13 +195,14 @@ function onAddSuccess({
 
       <view class="detail__footer">
         <view
-          v-if="place.status === 'unvisited'"
           class="detail__btn detail__btn--secondary"
           hover-class="detail__btn--hover"
           :hover-stay-time="100"
-          @tap="handleMarkVisited"
+          @tap="handleVisitedChange"
         >
-          <text class="detail__btn-text detail__btn-text--secondary">标记为去过</text>
+          <text class="detail__btn-text detail__btn-text--secondary">
+            {{ place.visited ? '撤销去过' : '标记为去过' }}
+          </text>
         </view>
         <view
           class="detail__btn"
@@ -183,7 +216,8 @@ function onAddSuccess({
     </view>
 
     <view v-else class="empty">
-      <text class="empty__text">没有找到这个地方</text>
+      <text class="empty__text">{{ notFound ? '没有找到这个地方' : error }}</text>
+      <view v-if="!notFound" class="detail__btn" @tap="loadPlace"><text>重新加载</text></view>
     </view>
 
     <AddPlanSheet

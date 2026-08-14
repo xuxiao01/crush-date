@@ -9,31 +9,39 @@ import HomeListCard from '@/components/HomeListCard/index.vue'
 import WeekendInviteModal from '@/components/WeekendInviteModal.vue'
 import hotpotImage from '@/assets/素材-透明火锅.png'
 import castleImage from '@/assets/素材-透明摩天轮城堡.png'
-import { useFoodsStore } from '@/stores/foods'
-import { usePlacesStore } from '@/stores/places'
+import { getFoods, getPlaces } from '@/api/content'
+import { useContentConfigStore } from '@/stores/contentConfig'
+import type { CityCode } from '@/types/content'
 import { getStorage, setStorage } from '@/utils/storage'
 
-const foodsStore = useFoodsStore()
-const placesStore = usePlacesStore()
-const { totalCount: eatTotalCount } = storeToRefs(foodsStore)
-const { totalCount: goTotalCount } = storeToRefs(placesStore)
-
-const SHEET_ACTIONS = [
-  { name: '北京' },
-  { name: '原来你也是好奇宝宝' },
-  { name: '敬请期待～～～' },
-] as const
-
-const currentCity = ref('北京')
+const configStore = useContentConfigStore()
+const { cities, currentCityCode, currentCityName } = storeToRefs(configStore)
+const eatTotalCount = ref(0)
+const goTotalCount = ref(0)
 const showCitySheet = ref(false)
 const showInvite = ref(false)
 const INVITE_AGREED_STORAGE_KEY = 'crush_date_weekend_invite_agreed_v1'
 
-onShow(() => {
+onShow(async () => {
   showInvite.value = getStorage<boolean>(INVITE_AGREED_STORAGE_KEY) !== true
-  void foodsStore.fetchFoods()
-  void placesStore.fetchPlaces()
+  await configStore.loadConfig()
+  void loadTotals()
 })
+
+async function loadTotals() {
+  const cityCode = currentCityCode.value
+  try {
+    const [foods, places] = await Promise.all([
+      getFoods({ cityCode, page: 1, pageSize: 1 }, { showError: false }),
+      getPlaces({ cityCode, page: 1, pageSize: 1 }, { showError: false }),
+    ])
+    if (cityCode !== currentCityCode.value) return
+    eatTotalCount.value = foods.total
+    goTotalCount.value = places.total
+  } catch {
+    // Keep the previous totals when a background refresh fails.
+  }
+}
 
 function handleInviteAgreed() {
   setStorage(INVITE_AGREED_STORAGE_KEY, true)
@@ -43,16 +51,9 @@ function handleCitySwitch() {
   showCitySheet.value = true
 }
 
-function onCitySelect({ item }: { item: { name: string }; index: number }) {
-  if (item.name === '北京') {
-    currentCity.value = '北京'
-    return
-  }
-
-  uni.showToast({
-    title: item.name,
-    icon: 'none',
-  })
+function onCitySelect({ item }: { item: { name: string; code: CityCode }; index: number }) {
+  configStore.setCurrentCity(item.code)
+  void loadTotals()
 }
 </script>
 
@@ -68,7 +69,7 @@ function onCitySelect({ item }: { item: { name: string }; index: number }) {
         <text class="hero__subtitle">看看想吃的，看看想去的！</text>
         <view class="hero__location" @tap="handleCitySwitch">
           <text class="hero__location-pin">📍</text>
-          <text class="hero__location-city">{{ currentCity }}</text>
+          <text class="hero__location-city">{{ currentCityName }}</text>
           <text class="hero__location-caret">⌄</text>
         </view>
       </view>
@@ -95,7 +96,7 @@ function onCitySelect({ item }: { item: { name: string }; index: number }) {
 
     <wd-action-sheet
       v-model="showCitySheet"
-      :actions="[...SHEET_ACTIONS]"
+      :actions="cities.map((city) => ({ name: city.name, code: city.code }))"
       cancel-text="取消"
       @select="onCitySelect"
     />

@@ -3,6 +3,7 @@ import type { FoodCardItem } from '@/types/food'
 
 const props = defineProps<{
   item: FoodCardItem
+  categoryName?: string
 }>()
 
 function goDetail() {
@@ -24,27 +25,26 @@ function goDetail() {
       :class="item.status === 'visited' ? 'food-card--visited' : 'food-card--unvisited'"
     >
       <view class="food-card__cover">
-        <image class="food-card__image" :src="item.image" mode="aspectFill" />
-
-        <view v-if="item.status !== 'visited'" class="food-card__bookmark">
-          <text class="food-card__bookmark-text">待尝</text>
-        </view>
+        <image class="food-card__image" :src="item.image" mode="aspectFill" lazy-load />
       </view>
 
       <view class="food-card__body">
         <text class="food-card__name">{{ item.name }}</text>
-        <text class="food-card__type">{{ item.type }}</text>
+        <text class="food-card__type">
+          {{ item.status === 'visited' ? item.type : item.comment }}
+        </text>
 
-        <view class="food-card__quote">
+        <text v-if="item.status !== 'visited'" class="food-card__status-pill">
+          {{ categoryName || '待尝' }}
+        </text>
+
+        <view v-if="item.status === 'visited'" class="food-card__quote">
           <text class="food-card__quote-mark">“</text>
           <text class="food-card__comment">{{ item.comment }}</text>
         </view>
 
-        <text
-          class="food-card__date"
-          :class="{ 'food-card__date--placeholder': item.status !== 'visited' }"
-        >
-          {{ item.status === 'visited' ? item.visitedDate : '\u00A0' }}
+        <text v-if="item.status === 'visited'" class="food-card__date">
+          {{ item.visitedDate }}
         </text>
       </view>
     </view>
@@ -63,11 +63,10 @@ function goDetail() {
 .food-card-wrap {
   position: relative;
   width: 100%;
-  height: 480rpx;
+  height: 100%;
   min-width: 0;
-  min-height: 480rpx;
+  min-height: 0;
   max-width: 100%;
-  max-height: 480rpx;
   overflow: visible;
   box-sizing: border-box;
   transition: transform 160ms ease;
@@ -89,8 +88,9 @@ function goDetail() {
 }
 
 .food-card--unvisited {
-  border: 2rpx dashed #e2d2c4;
+  border: 2rpx solid #edddd2;
   background: #fffdfb;
+  box-shadow: 0 8rpx 22rpx rgba(104, 70, 48, 0.06);
 }
 
 .food-card--visited {
@@ -120,33 +120,6 @@ function goDetail() {
 
 .food-card--unvisited .food-card__image {
   filter: saturate(0.75);
-}
-
-.food-card__bookmark {
-  position: absolute;
-  top: 0;
-  right: 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-  padding: 12rpx 18rpx 14rpx;
-  border: 2rpx solid rgba(218, 198, 166, 0.82);
-  border-top: 0;
-  border-radius: 0 0 10rpx 10rpx;
-  background: rgba(255, 248, 229, 0.94);
-  box-shadow: 0 5rpx 12rpx rgba(91, 69, 44, 0.12);
-  box-sizing: border-box;
-  pointer-events: none;
-}
-
-.food-card__bookmark-text {
-  color: #75685b;
-  font-size: 22rpx;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 2rpx;
-  white-space: nowrap;
 }
 
 .food-card__stamp {
@@ -230,6 +203,10 @@ function goDetail() {
   box-sizing: border-box;
 }
 
+.food-card--unvisited .food-card__body {
+  padding: 14rpx 16rpx 12rpx;
+}
+
 .food-card__name {
   display: block;
   flex: 0 0 auto;
@@ -255,6 +232,23 @@ function goDetail() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.food-card__status-pill {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 12rpx;
+  padding: 7rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff0eb;
+  color: #ee7557;
+  font-size: 21rpx;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .food-card__quote {
@@ -306,9 +300,5 @@ function goDetail() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.food-card__date--placeholder {
-  visibility: hidden;
 }
 </style>

@@ -4,14 +4,15 @@ import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
 import { createContentItem } from '@/api/content'
+import { useContentConfigStore } from '@/stores/contentConfig'
 import { useFoodsStore } from '@/stores/foods'
-import { usePlacesStore } from '@/stores/places'
+import type { FoodCategoryId, PlaceCategoryId } from '@/types/content'
 
 type ContentKind = 'food' | 'place'
 
 const kind = ref<ContentKind>('food')
 const name = ref('')
-const type = ref('')
+const categoryId = ref<FoodCategoryId | PlaceCategoryId>()
 const comment = ref('')
 const image = ref('')
 const cropSource = ref('')
@@ -19,7 +20,15 @@ const showCropper = ref(false)
 const saving = ref(false)
 
 const foodsStore = useFoodsStore()
-const placesStore = usePlacesStore()
+const configStore = useContentConfigStore()
+const availableCategories = computed(() =>
+  kind.value === 'food'
+    ? configStore.selectableFoodCategories
+    : configStore.selectablePlaceCategories,
+)
+const categoryLoadFailed = computed(
+  () => Boolean(configStore.error) && !availableCategories.value.length,
+)
 
 const copy = computed(() =>
   kind.value === 'food'
@@ -29,7 +38,6 @@ const copy = computed(() =>
         nameLabel: '美食名称',
         namePlaceholder: '例如：阿里郎朝鲜烤肉',
         typeLabel: '美食分类',
-        typePlaceholder: '例如：烤肉 · 朝鲜风味',
         commentLabel: '想说的话',
         commentPlaceholder: '为什么想和对方一起去吃？',
         submit: '加入想吃清单',
@@ -41,7 +49,6 @@ const copy = computed(() =>
         nameLabel: '地点名称',
         namePlaceholder: '例如：颐和园傍晚散步',
         typeLabel: '地点分类',
-        typePlaceholder: '例如：公园 · 散步',
         commentLabel: '想说的话',
         commentPlaceholder: '为什么想和对方一起去？',
         submit: '加入想去清单',
@@ -49,8 +56,12 @@ const copy = computed(() =>
       },
 )
 
-onLoad((options) => {
+onLoad(async (options) => {
   kind.value = options?.kind === 'place' ? 'place' : 'food'
+  await configStore.loadConfig()
+  const requestedCategory = typeof options?.categoryId === 'string' ? options.categoryId : ''
+  const matched = availableCategories.value.find((item) => item.id === requestedCategory)
+  if (matched && !matched.filterOnly) categoryId.value = matched.id
 })
 
 function chooseCover() {
@@ -83,7 +94,7 @@ function clearCover() {
 function validate() {
   if (!image.value) return '请先选择一张封面图'
   if (!name.value.trim()) return `请填写${copy.value.nameLabel}`
-  if (!type.value.trim()) return `请填写${copy.value.typeLabel}`
+  if (!categoryId.value) return `请选择${copy.value.typeLabel}`
   return ''
 }
 
@@ -97,26 +108,23 @@ async function submit() {
 
   saving.value = true
   try {
-    const createdItem = await createContentItem({
+    const selectedCategory = availableCategories.value.find((item) => item.id === categoryId.value)
+    if (!selectedCategory || selectedCategory.filterOnly) {
+      throw new Error('分类配置不可用，请重试')
+    }
+
+    await createContentItem({
       filePath: image.value,
       contentType: kind.value,
+      cityCode: configStore.currentCityCode,
+      categoryId: selectedCategory.id,
       name: name.value.trim(),
-      type: type.value.trim(),
+      type: selectedCategory.name,
       comment: comment.value.trim(),
     })
 
-    const payload = {
-      id: createdItem.id,
-      name: createdItem.name,
-      type: createdItem.type,
-      comment: createdItem.comment,
-      image: createdItem.image,
-    }
-
     if (kind.value === 'food') {
-      foodsStore.addFood(payload)
-    } else {
-      placesStore.addPlace(payload)
+      foodsStore.invalidate()
     }
 
     uni.showToast({ title: copy.value.success, icon: 'success' })
@@ -131,6 +139,10 @@ async function submit() {
   } finally {
     saving.value = false
   }
+}
+
+function retryConfig() {
+  void configStore.loadConfig(true)
 }
 </script>
 
@@ -178,17 +190,33 @@ async function submit() {
           />
         </view>
 
-        <view class="form-field">
+        <view class="form-field form-field--category">
           <text class="form-field__label"
             >{{ copy.typeLabel }} <text class="required">*</text></text
           >
-          <input
-            v-model="type"
-            class="form-field__input"
-            :placeholder="copy.typePlaceholder"
-            placeholder-class="form-field__placeholder"
-            maxlength="30"
-          />
+          <view v-if="availableCategories.length" class="category-options">
+            <view
+              v-for="category in availableCategories"
+              :key="category.id"
+              class="category-option"
+              :class="{ 'category-option--active': categoryId === category.id }"
+              hover-class="category-option--hover"
+              @tap="categoryId = category.id"
+            >
+              <text class="category-option__text">{{ category.name }}</text>
+              <text v-if="categoryId === category.id" class="category-option__check">✓</text>
+            </view>
+          </view>
+          <view v-if="configStore.error" class="category-config-tip">
+            <text>分类配置更新失败，当前显示默认分类</text>
+            <text class="category-retry" @tap="retryConfig">重新加载</text>
+          </view>
+          <view v-if="!availableCategories.length" class="category-options">
+            <text class="form-field__placeholder">
+              {{ categoryLoadFailed ? '分类加载失败' : '正在加载分类…' }}
+            </text>
+            <text v-if="categoryLoadFailed" class="category-retry" @tap="retryConfig">重试</text>
+          </view>
         </view>
 
         <view class="form-field form-field--last">
@@ -374,8 +402,93 @@ async function submit() {
   border-bottom: 0;
 }
 
+.form-field--category {
+  padding-bottom: 30rpx;
+}
+
 .required {
   color: #ff7958;
+}
+
+.category-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 22rpx;
+}
+
+.category-option {
+  display: flex;
+  width: calc(50% - 8rpx);
+  min-height: 68rpx;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20rpx;
+  border: 2rpx solid #eadfd8;
+  border-radius: 18rpx;
+  background: #fffaf7;
+  box-sizing: border-box;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.category-option--hover {
+  transform: scale(0.98);
+}
+
+.category-option--active {
+  border-color: #ff9b7e;
+  background: #fff0ea;
+  box-shadow: 0 5rpx 14rpx rgba(255, 121, 87, 0.1);
+}
+
+.category-option__text {
+  min-width: 0;
+  overflow: hidden;
+  color: #64554d;
+  font-size: 24rpx;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-option--active .category-option__text {
+  color: #e96d50;
+  font-weight: 600;
+}
+
+.category-option__check {
+  display: flex;
+  width: 30rpx;
+  height: 30rpx;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8rpx;
+  border-radius: 50%;
+  background: #ff8061;
+  color: #ffffff;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.category-config-tip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 16rpx;
+  color: #aa9184;
+  font-size: 21rpx;
+}
+
+.category-retry {
+  flex-shrink: 0;
+  color: #ee7557;
+  font-weight: 600;
 }
 
 .form-field__input,

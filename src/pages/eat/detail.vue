@@ -4,9 +4,12 @@ import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
 import AddPlanSheet from '@/components/plan/AddPlanSheet.vue'
-import { deleteContentItem } from '@/api/content'
+import { deleteContentItem, getFoodById, updateContentItemVisited } from '@/api/content'
+import { ApiError } from '@/api/index'
 import { useFoodsStore } from '@/stores/foods'
 import { usePlansStore } from '@/stores/plans'
+import type { FoodContentItem } from '@/types/content'
+import { formatVisitedDate } from '@/utils/contentItem'
 
 const foodsStore = useFoodsStore()
 const plansStore = usePlansStore()
@@ -15,33 +18,58 @@ const animating = ref(false)
 const showBadge = ref(false)
 const showAddPlan = ref(false)
 const deleting = ref(false)
+const loading = ref(true)
+const error = ref('')
+const notFound = ref(false)
+const food = ref<FoodContentItem>()
 
-const food = computed(() => (foodId.value ? foodsStore.getById(foodId.value) : undefined))
 const navTitle = computed(() => food.value?.name || '美食详情')
+const visitedDate = computed(() => formatVisitedDate(food.value?.visitedAt ?? null))
 
 onLoad((query) => {
   void plansStore.hydrate()
   foodId.value = typeof query?.id === 'string' ? decodeURIComponent(query.id) : ''
-  if (food.value?.status === 'visited') {
-    showBadge.value = true
-  }
+  void loadFood()
 })
 
-async function handleMarkVisited() {
-  if (!food.value || food.value.status === 'visited' || animating.value) return
+async function loadFood() {
+  loading.value = true
+  error.value = ''
+  notFound.value = false
+  if (!foodId.value) {
+    notFound.value = true
+    loading.value = false
+    return
+  }
+  try {
+    food.value = await getFoodById(foodId.value, { showError: false })
+    showBadge.value = food.value.visited
+  } catch (loadError) {
+    if (loadError instanceof ApiError && loadError.statusCode === 404) notFound.value = true
+    else error.value = loadError instanceof Error ? loadError.message : '详情加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleVisitedChange() {
+  if (!food.value || animating.value) return
 
   animating.value = true
-  const ok = await foodsStore.markVisited(food.value.id)
-  if (!ok) {
+  const nextVisited = !food.value.visited
+  try {
+    food.value = await updateContentItemVisited<FoodContentItem>(food.value.id, nextVisited)
+    showBadge.value = food.value.visited
+    foodsStore.removeFood(food.value.id)
+    foodsStore.invalidate()
+    uni.showToast({ title: nextVisited ? '已标记为吃过' : '已撤销吃过', icon: 'success' })
+  } catch {
     animating.value = false
     return
   }
 
-  showBadge.value = true
-
   setTimeout(() => {
     animating.value = false
-    uni.navigateBack()
   }, 350)
 }
 
@@ -127,7 +155,11 @@ function onAddSuccess({
       </template>
     </CustomNavbar>
 
-    <view v-if="food" class="detail">
+    <view v-if="loading" class="empty">
+      <text class="empty__text">正在加载…</text>
+    </view>
+
+    <view v-else-if="food" class="detail">
       <view class="detail__cover-wrap">
         <image class="detail__cover" :src="food.image" mode="aspectFill" />
 
@@ -150,9 +182,9 @@ function onAddSuccess({
         </view>
 
         <view class="detail__status">
-          <template v-if="food.status === 'visited'">
+          <template v-if="food.visited">
             <text class="detail__status-label">吃过啦</text>
-            <text class="detail__status-date">{{ food.visitedDate }}</text>
+            <text class="detail__status-date">{{ visitedDate }}</text>
           </template>
           <template v-else>
             <text class="detail__status-label detail__status-label--pending">还没吃</text>
@@ -163,13 +195,14 @@ function onAddSuccess({
 
       <view class="detail__footer">
         <view
-          v-if="food.status === 'unvisited'"
           class="detail__btn detail__btn--secondary"
           hover-class="detail__btn--hover"
           :hover-stay-time="100"
-          @tap="handleMarkVisited"
+          @tap="handleVisitedChange"
         >
-          <text class="detail__btn-text detail__btn-text--secondary">标记为吃过</text>
+          <text class="detail__btn-text detail__btn-text--secondary">{{
+            food.visited ? '撤销吃过' : '标记为吃过'
+          }}</text>
         </view>
         <view
           class="detail__btn"
@@ -183,7 +216,8 @@ function onAddSuccess({
     </view>
 
     <view v-else class="empty">
-      <text class="empty__text">没有找到这道美食</text>
+      <text class="empty__text">{{ notFound ? '没有找到这道美食' : error }}</text>
+      <view v-if="!notFound" class="detail__btn" @tap="loadFood"><text>重新加载</text></view>
     </view>
 
     <AddPlanSheet

@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import PlanPeriodSection from '@/components/plan/PlanPeriodSection.vue'
-import { useFoodsStore } from '@/stores/foods'
-import { usePlacesStore } from '@/stores/places'
+import { getFoods, getPlaces } from '@/api/content'
+import { useContentConfigStore } from '@/stores/contentConfig'
 import { usePlansStore } from '@/stores/plans'
+import type { ContentItem } from '@/types/content'
 import type { PlanItemType, PlanPeriod } from '@/types/plan'
 import { PERIOD_LABELS, PERIOD_ORDER, itemTypeForPeriod } from '@/types/plan'
 
 const props = defineProps<{ planId: string; readonly?: boolean }>()
 const plansStore = usePlansStore()
-const foodsStore = useFoodsStore()
-const placesStore = usePlacesStore()
+const configStore = useContentConfigStore()
+const foodCandidates = ref<ContentItem[]>([])
+const placeCandidates = ref<ContentItem[]>([])
 const showPicker = ref(false)
 const showDeleteDialog = ref(false)
 const pendingRemoveItemId = ref('')
@@ -23,14 +25,14 @@ const plan = computed(() => plansStore.getById(props.planId))
 const pickerTitle = computed(() => `添加${PERIOD_LABELS[editPeriod.value]}安排`)
 const candidates = computed(() =>
   addType.value === 'food'
-    ? foodsStore.list.map((item) => ({
+    ? foodCandidates.value.map((item) => ({
         id: item.id,
         title: item.name,
         image: item.image,
         note: item.comment,
         type: 'food' as const,
       }))
-    : placesStore.list.map((item) => ({
+    : placeCandidates.value.map((item) => ({
         id: item.id,
         title: item.name,
         image: item.image,
@@ -41,9 +43,24 @@ const candidates = computed(() =>
 
 watch(showPicker, (open) => {
   if (!open) return
-  void foodsStore.fetchFoods()
-  void placesStore.fetchPlaces()
+  void loadCandidates()
 })
+
+async function loadCandidates() {
+  await configStore.loadConfig()
+  const cityCode = configStore.currentCityCode
+  try {
+    const [foods, places] = await Promise.all([
+      getFoods({ cityCode, page: 1, pageSize: 100 }, { showError: false }),
+      getPlaces({ cityCode, page: 1, pageSize: 100 }, { showError: false }),
+    ])
+    if (cityCode !== configStore.currentCityCode) return
+    foodCandidates.value = foods.list
+    placeCandidates.value = places.list
+  } catch {
+    uni.showToast({ title: '候选内容加载失败', icon: 'none' })
+  }
+}
 
 function itemsOf(period: PlanPeriod) {
   return (
