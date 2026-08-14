@@ -1,128 +1,178 @@
-# Crush Date Plan
+![雨间计划封面](https://typorabucket0308.oss-cn-beijing.aliyuncs.com/images/20260603103934962.jpg)
 
-基于 uni-app 的 AI 约会计划前端项目。当前阶段为脚手架与开发链路验证，后续将支持创建约会计划、候选项分享、双方选择与路线生成等能力。
+<div align="center">
+
+# 雨间计划
+
+一个用于整理约会灵感、编排出行计划并保存共同回忆的 uni-app 跨端前端项目。
+
+</div>
+
+## 项目简介
+
+雨间计划（仓库名 `crush-date`）面向情侣约会场景，将“想吃什么”“想去哪里”和具体日期安排集中到一套流程中。当前前端已实现内容清单、计划编排、完成记录与精选照片等核心页面，并通过 API 与独立后端服务交换数据。
+
+项目基于 uni-app CLI、Vue 3 和 TypeScript 开发，当前主要面向 H5 与微信小程序。仓库只包含前端代码；运行完整业务功能时需要配套后端提供计划、内容和图片接口。
+
+## 功能特性
+
+- **约会灵感清单**：分别管理想吃的美食和想去的地点，展示未体验、已体验数量及完成进度。
+- **内容创建与维护**：从相册或相机选择封面，按 4:3 裁剪后上传；支持新增、删除以及标记“吃过了 / 去过了”。
+- **计划状态管理**：区分本次计划、备用计划和过去的计划，支持创建、编辑、启用、完成、重新计划与删除。
+- **分时段行程编排**：按上午、中午、下午、晚上组织安排，可将美食或地点加入计划并调整计划内容。
+- **完成记录**：为已完成计划上传、预览和批量删除精选照片；单个计划最多展示 9 张照片。
+- **跨端基础体验**：统一封装页面容器、导航栏、卡片、弹层和本地存储，适配 H5 与小程序运行环境。
+- **质量保障**：提供 TypeScript 类型检查和 Vitest 单元测试，覆盖 API、计划状态、日期及图片处理等逻辑。
 
 ## 技术栈
 
-- uni-app
-- Vue 3
-- TypeScript
-- Vite
-- Pinia
-- pnpm
-- SCSS
+| 分类       | 技术                              |
+| ---------- | --------------------------------- |
+| 跨端框架   | uni-app 3                         |
+| 前端框架   | Vue 3、TypeScript                 |
+| 构建工具   | Vite 5                            |
+| 状态管理   | Pinia 2                           |
+| UI 与样式  | Wot Design Uni、SCSS              |
+| 测试与规范 | Vitest、vue-tsc、ESLint、Prettier |
+| 包管理器   | pnpm（仓库包含 `pnpm-lock.yaml`） |
 
-## 环境要求
+## 核心目录结构
 
-- Node.js 20+（推荐 22）
-- pnpm 9+（推荐 10）
-- [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)
-
-## 安装依赖
-
-```bash
-pnpm install
+```text
+crush-date/
+├── .github/workflows/deploy.yml  # H5 持续集成与部署
+├── doc/                          # 架构说明与后端接口规划
+├── src/
+│   ├── api/                      # 请求封装、计划与内容接口
+│   ├── assets/                   # 由源码导入的图片资源
+│   ├── components/               # 通用组件与计划业务组件
+│   ├── data/                     # 当前静态展示数据
+│   ├── pages/                    # 首页、计划、清单、内容与回忆页面
+│   ├── static/                   # TabBar 与品牌固定资源
+│   ├── stores/                   # Pinia 应用、计划、美食与地点状态
+│   ├── styles/                   # 全局样式、变量和 Mixin
+│   ├── types/                    # 共享领域类型
+│   ├── utils/                    # 平台、存储、日期与图片工具
+│   ├── App.vue                   # 应用入口组件
+│   ├── main.ts                   # Vue 与 Pinia 初始化
+│   ├── manifest.json             # uni-app 平台配置
+│   └── pages.json                # 页面与 TabBar 注册
+├── package.json                  # 依赖与命令
+├── vite.config.ts                # Vite 与 H5 基础路径配置
+└── vitest.config.ts              # 单元测试配置
 ```
 
-## H5 开发
+## 本地运行
+
+### 环境要求
+
+- Node.js 20+
+- pnpm 9+
+- 微信小程序调试需要安装微信开发者工具
+
+### 安装依赖
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+### 启动 H5
 
 ```bash
 pnpm dev:h5
 ```
 
-启动后在浏览器访问终端输出的本地地址（通常为 `http://localhost:5173`）。
+访问地址以终端输出为准。业务页面会请求配置的后端服务；未启动后端时，接口驱动的数据与操作不可用。
 
-## 微信小程序开发
+### 启动微信小程序
 
 ```bash
 pnpm dev:mp-weixin
 ```
 
-然后在微信开发者工具中导入编译产物目录：
+编译后，在微信开发者工具中导入：
 
 ```text
 dist/dev/mp-weixin
 ```
 
-### 微信开发者工具首次配置
+`src/manifest.json` 未写入真实微信 AppID，本地调试时需要在微信开发者工具中自行配置测试身份或项目 AppID，且不要将真实 AppID 提交到仓库。
 
-1. 先运行 `pnpm dev:mp-weixin`，等待编译完成。
-2. 打开微信开发者工具 → 导入项目。
-3. 项目目录选择：`dist/dev/mp-weixin`。
-4. AppID 需手动填写：
-   - 可使用测试号
-   - 或选择游客模式
-   - 不要将真实 AppID 写入仓库配置
-5. 确认热更新：
-   - 保持 `pnpm dev:mp-weixin` 运行
-   - 修改 `src/pages/home/index.vue` 并保存
-   - 微信开发者工具应自动重新编译并刷新页面
+### 检查与测试
 
-## 构建
+```bash
+pnpm type-check
+pnpm test
+```
+
+### 生产构建
 
 ```bash
 pnpm build:h5
 pnpm build:mp-weixin
 ```
 
-构建产物目录：
+对应产物默认生成到 `dist/build/h5` 和 `dist/build/mp-weixin`。`dist/` 是生成目录，不应手动修改或提交。
 
-- H5：`dist/build/h5`
-- 微信小程序：`dist/build/mp-weixin`
-
-## 类型检查
-
-```bash
-pnpm type-check
-```
+`package.json` 还提供支付宝、百度、QQ、抖音、京东、快手、飞书、小红书、鸿蒙与快应用等目标平台的开发和构建脚本；这些平台的业务适配情况待逐端验证。
 
 ## 环境变量
 
-复制 `.env.example` 为 `.env.development` 或 `.env.production`，按需配置：
+项目只读取以下前端环境变量：
+
+| 变量                | 必填 | 说明                                               |
+| ------------------- | ---- | -------------------------------------------------- |
+| `VITE_API_BASE_URL` | 否   | API 服务基础地址；为空时使用当前站点的同源相对路径 |
+
+可从 `.env.example` 创建本地环境文件：
 
 ```bash
-VITE_API_BASE_URL=http://localhost:3000
+cp .env.example .env.development
 ```
 
-`.env.development` 与 `.env.production` 不会提交到 Git 仓库。
+按本地环境填写变量值后重新启动开发服务。`.env.development` 和 `.env.production` 已被 Git 忽略；所有 `VITE_*` 值都会进入前端构建产物，因此不得用于保存密码、私钥或令牌。
 
-## 开发流程建议
+## 部署说明
 
-1. 普通页面、布局和样式优先在 H5 环境调试，效率更高。
-2. 每完成一个页面或交互，都在微信开发者工具中同步验证。
-3. 微信登录、分享、地图、授权等能力应直接在微信小程序环境中开发。
-4. 不要等整个 H5 完成后再开始适配微信小程序。
+### H5
 
-## 当前页面
+仓库已有 [GitHub Actions 工作流](.github/workflows/deploy.yml)。推送到 `main` 或手动触发后，流程会依次：
 
-- `pages/home/index`：首页，展示项目状态与基础能力验证入口
-- `pages/debug/index`：调试页，验证跳转、Pinia、本地存储、Toast、系统信息与条件编译
+1. 使用 Node.js 20 与 pnpm 9 安装锁定依赖。
+2. 执行类型检查和单元测试。
+3. 构建 H5 并校验产物。
+4. 使用仓库 Secrets 中的服务器连接信息发布静态文件。
 
-## 项目结构
+当前 `vite.config.ts` 将 H5 `base` 配置为 `/eidolonh5/`。若改为域名根目录或其他子路径部署，需要同步调整该配置及工作流中的产物校验规则。
 
-```text
-src/
-├── api/              # 请求层占位
-├── components/       # 通用组件
-├── pages/            # 页面
-├── stores/           # Pinia 状态
-├── styles/           # 全局样式与设计变量
-├── types/            # 类型定义
-├── utils/            # 工具函数
-├── App.vue
-├── main.ts
-├── manifest.json
-├── pages.json
-└── uni.scss
-```
+工作流依赖以下 GitHub Secrets，具体值应仅在仓库设置中维护：
 
-## 暂未实现
+- `SERVER_HOST`
+- `SERVER_USER`
+- `SERVER_SSH_KEY`
+- `SERVER_PORT`
 
-- 微信正式登录与用户注册
-- AI 推荐接口
-- 地图与位置能力
-- 分享邀请流程
-- 后端接口与数据库
-- 完整约会创建流程
-- UI 组件库大规模接入
-- 复杂动画、支付、消息通知
+### 微信小程序
+
+项目已提供生产构建命令，但上传、审核和发布仍需在微信开发者工具或团队既有发布流程中完成；自动化发布方案待补充。
+
+## 当前边界
+
+- 仓库不包含后端实现，接口数据、文件存储与数据库需由配套服务提供。
+- 尚未建立完整的用户登录、身份鉴权与多人数据隔离体系。
+- 城市切换目前仅有北京入口，其余选项为占位提示。
+- 回忆相册页面使用仓库内静态数据；计划完成页的精选照片则来自后端接口。
+- H5 与微信小程序是当前主要目标，其他已配置平台仍需专项兼容性验证。
+
+## 后续计划
+
+- [ ] 补充登录鉴权与用户数据隔离。
+- [ ] 完善接口加载、空状态和异常恢复体验。
+- [ ] 扩充 Store、页面交互与跨端差异的自动化测试。
+- [ ] 完成 H5 与微信小程序的持续真机回归。
+- [ ] 根据实际发布需求补充微信小程序自动化发布流程。
+
+## 项目文档
+
+- [项目技术架构](doc/project-architecture.md)
+- [后端 API 规划](doc/backend-api-plan.md)

@@ -2,43 +2,43 @@
 
 ## Project Structure & Module Organization
 
-This is a Vue 3 + TypeScript UniApp application targeting H5 and multiple mini-program platforms. Application code lives in `src/`:
+This is a Vue 3 + TypeScript uni-app application targeting H5 and mini-programs. Source code lives in `src/`:
 
-- `pages/` contains route-level screens; register new pages in `src/pages.json`.
-- `components/` contains reusable Vue components, with feature-specific components grouped in subdirectories such as `components/plan/`.
-- `stores/` contains Pinia stores; `api/`, `utils/`, and `types/` hold service, helper, and type modules.
-- `assets/` contains imported images; `static/` contains files referenced by fixed runtime paths, including tab bar icons.
-- `styles/`, `uni.scss`, and `App.vue` define shared SCSS and global application styling.
+- `pages/` contains route-level views; register new pages in `src/pages.json`.
+- `components/` contains reusable UI, with feature groups such as `components/plan/`.
+- `stores/` contains Pinia state; `api/`, `utils/`, and `types/` contain services, helpers, and shared models.
+- `assets/` holds imported media, while `static/` holds fixed-path runtime assets such as tab bar icons.
+- `styles/`, `uni.scss`, and `App.vue` provide shared SCSS and global styling.
 
-Generated output is written to `dist/` and must not be edited directly. No automated test directory currently exists.
+Architecture and backend planning notes are in `doc/`. Generated files under `dist/` must not be edited or committed.
 
 ## Build, Test, and Development Commands
 
 Use Node.js 20+ and pnpm 9+.
 
-- `pnpm install`: install locked dependencies.
-- `pnpm dev:h5`: start the H5 development server.
-- `pnpm dev:mp-weixin`: watch and compile to `dist/dev/mp-weixin` for WeChat DevTools.
-- `pnpm build:h5`: create the production H5 bundle.
-- `pnpm build:mp-weixin`: create the production WeChat mini-program bundle.
-- `pnpm type-check`: run `vue-tsc` without emitting files.
-- `pnpm exec eslint .`: lint Vue and TypeScript sources.
+- `pnpm install --frozen-lockfile`: install the locked dependency set.
+- `pnpm dev:h5`: run the H5 development server.
+- `pnpm dev:mp-weixin`: watch-build into `dist/dev/mp-weixin` for WeChat DevTools.
+- `pnpm build:h5` / `pnpm build:mp-weixin`: create production bundles.
+- `pnpm test`: run all Vitest unit tests once.
+- `pnpm type-check`: validate Vue and TypeScript types without emitting files.
+- `pnpm exec eslint .`: lint TypeScript and Vue files.
 - `pnpm exec prettier --check .`: verify formatting.
 
-Other supported platforms have matching `dev:<platform>` and `build:<platform>` scripts in `package.json`.
+See `package.json` for matching commands for other supported platforms.
 
 ## Coding Style & Naming Conventions
 
-Use two-space indentation, LF line endings, UTF-8, and a final newline. Prettier uses single quotes, no semicolons, trailing commas, and a 100-character print width. Prefer `<script setup lang="ts">`, typed props/emits, and the `@/` alias for `src/` imports.
+Follow `.editorconfig`: UTF-8, LF endings, two-space indentation, and a final newline. Prettier enforces single quotes, no semicolons, trailing commas, and a 100-character width. Prefer `<script setup lang="ts">`, typed props/emits, and `@/` imports.
 
-Name Vue components in PascalCase (`WeekendInviteModal.vue`), functions and variables in camelCase, and Pinia composables as `useXStore`. Keep page paths lowercase. Use BEM-like scoped class names such as `.invite-card__title`.
+Use PascalCase for components (`PlanItemCard.vue`), camelCase for functions and variables, `useXStore` for Pinia stores, lowercase page paths, and BEM-like scoped classes such as `.plan-card__title`.
 
 ## Testing Guidelines
 
-There is no configured unit-test framework or coverage threshold. Before submitting changes, run type checking, linting, and both H5 and relevant mini-program builds. Manually verify responsive layout and platform APIs in H5 and WeChat DevTools. If tests are introduced, place `*.spec.ts` beside the module or under `src/**/__tests__/`.
+Vitest runs in the Node environment and discovers `src/**/*.spec.ts`. Keep tests beside the code they exercise, name them `<module>.spec.ts`, and cover both successful and failure paths. No coverage threshold is configured. Before opening a PR, run `pnpm test`, `pnpm type-check`, linting, and the relevant platform build; manually verify UI changes in H5 and WeChat DevTools.
 
 ## Commit & Pull Request Guidelines
 
-The repository has no established commit history to infer conventions from. Use concise imperative messages, preferably Conventional Commit style, for example `fix(home): cover tab bar with invite modal`.
+History follows concise Conventional Commits, often with Chinese summaries: `feat(plan): ...`, `fix(deploy): ...`. Use `type(scope): description`, avoid duplicate prefixes, and keep each commit focused.
 
-Pull requests should explain the user-facing change, list tested platforms and commands, link related issues, and include screenshots or recordings for UI work. Keep generated `dist/` files, local `.env*` files, real AppIDs, and secrets out of commits.
+PRs should describe user-visible behavior, link related issues, list tested commands/platforms, and include screenshots or recordings for UI changes. Never commit real AppIDs, secrets, local `.env*` files, or generated `dist/` output; copy `.env.example` for local configuration.
