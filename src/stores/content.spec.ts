@@ -27,6 +27,7 @@ const food: FoodContentItem = {
   image: '/food.jpg',
   visited: false,
   visitedAt: null,
+  location: null,
 }
 
 const place: PlaceContentItem = {
@@ -40,6 +41,7 @@ const place: PlaceContentItem = {
   image: '/place.jpg',
   visited: false,
   visitedAt: null,
+  location: null,
 }
 
 function response<TItem extends ContentItem>(

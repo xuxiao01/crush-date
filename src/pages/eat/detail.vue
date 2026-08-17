@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
+import ContentLocationCard from '@/components/content/ContentLocationCard.vue'
 import AddPlanSheet from '@/components/plan/AddPlanSheet.vue'
 import { deleteContentItem, getFoodById, updateContentItemVisited } from '@/api/content'
 import { ApiError } from '@/api/index'
@@ -180,6 +181,13 @@ function onAddSuccess({
           <text class="detail__quote-mark">“</text>
           <text class="detail__comment">{{ food.comment }}</text>
         </view>
+
+        <ContentLocationCard
+          v-if="food.location"
+          kind="food"
+          :content-id="food.id"
+          :location="food.location"
+        />
 
         <view class="detail__status">
           <template v-if="food.visited">

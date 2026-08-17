@@ -3,10 +3,12 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
+import ContentLocationPicker from '@/components/content/ContentLocationPicker.vue'
 import { createContentItem } from '@/api/content'
 import { useContentConfigStore } from '@/stores/contentConfig'
 import { useFoodsStore } from '@/stores/foods'
-import type { FoodCategoryId, PlaceCategoryId } from '@/types/content'
+import { usePlacesStore } from '@/stores/places'
+import type { ContentLocation, FoodCategoryId, PlaceCategoryId } from '@/types/content'
 
 type ContentKind = 'food' | 'place'
 
@@ -14,12 +16,14 @@ const kind = ref<ContentKind>('food')
 const name = ref('')
 const categoryId = ref<FoodCategoryId | PlaceCategoryId>()
 const comment = ref('')
+const location = ref<ContentLocation | null>(null)
 const image = ref('')
 const cropSource = ref('')
 const showCropper = ref(false)
 const saving = ref(false)
 
 const foodsStore = useFoodsStore()
+const placesStore = usePlacesStore()
 const configStore = useContentConfigStore()
 const availableCategories = computed(() =>
   kind.value === 'food'
@@ -121,10 +125,13 @@ async function submit() {
       name: name.value.trim(),
       type: selectedCategory.name,
       comment: comment.value.trim(),
+      location: location.value,
     })
 
     if (kind.value === 'food') {
       foodsStore.invalidate()
+    } else {
+      placesStore.invalidate()
     }
 
     uni.showToast({ title: copy.value.success, icon: 'success' })
@@ -218,6 +225,12 @@ function retryConfig() {
             <text v-if="categoryLoadFailed" class="category-retry" @tap="retryConfig">重试</text>
           </view>
         </view>
+
+        <ContentLocationPicker
+          v-model="location"
+          :city-code="configStore.currentCityCode"
+          :initial-keyword="name"
+        />
 
         <view class="form-field form-field--last">
           <view class="form-field__label-row">
@@ -413,16 +426,19 @@ function retryConfig() {
 .category-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 16rpx;
+  justify-content: space-between;
   margin-top: 22rpx;
 }
 
 .category-option {
   display: flex;
-  width: calc(50% - 8rpx);
+  width: 48%;
+  min-width: 0;
   min-height: 68rpx;
+  flex: 0 0 48%;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 16rpx;
   padding: 0 20rpx;
   border: 2rpx solid #eadfd8;
   border-radius: 18rpx;

@@ -32,6 +32,25 @@ export type SelectablePlaceCategoryOption = Omit<PlaceCategoryOption, 'id' | 'fi
   filterOnly: false
 }
 
+export interface ContentLocation {
+  provider: 'tencent'
+  poiId: string
+  title: string
+  address: string
+  latitude: number
+  longitude: number
+  adcode: string
+}
+
+export interface PoiSuggestion extends ContentLocation {
+  city: string
+  district: string
+}
+
+export interface PoiSuggestionsResponse {
+  list: PoiSuggestion[]
+}
+
 interface ContentItemBase {
   id: string
   cityCode: CityCode
@@ -41,6 +60,7 @@ interface ContentItemBase {
   image: string
   visited: boolean
   visitedAt: string | null
+  location: ContentLocation | null
 }
 
 export interface FoodContentItem extends ContentItemBase {

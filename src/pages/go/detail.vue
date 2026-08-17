@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
+import ContentLocationCard from '@/components/content/ContentLocationCard.vue'
 import AddPlanSheet from '@/components/plan/AddPlanSheet.vue'
 import { deleteContentItem, getPlaceById, updateContentItemVisited } from '@/api/content'
 import { ApiError } from '@/api/index'
@@ -181,15 +182,16 @@ function onAddSuccess({
           <text class="detail__comment">{{ place.comment }}</text>
         </view>
 
-        <view class="detail__status">
-          <template v-if="place.visited">
-            <text class="detail__status-label">去过了</text>
-            <text class="detail__status-date">{{ visitedDate }}</text>
-          </template>
-          <template v-else>
-            <text class="detail__status-label detail__status-label--pending">还没去</text>
-            <text class="detail__status-hint">去过之后记得回来标记一下</text>
-          </template>
+        <ContentLocationCard
+          v-if="place.location"
+          kind="place"
+          :content-id="place.id"
+          :location="place.location"
+        />
+
+        <view v-if="place.visited" class="detail__status">
+          <text class="detail__status-label">去过了</text>
+          <text class="detail__status-date">{{ visitedDate }}</text>
         </view>
       </view>
 
@@ -387,12 +389,7 @@ function onAddSuccess({
   color: #ff7b4d;
 }
 
-.detail__status-label--pending {
-  color: #8c817b;
-}
-
-.detail__status-date,
-.detail__status-hint {
+.detail__status-date {
   font-size: 26rpx;
   color: #8a6548;
   line-height: 1.45;

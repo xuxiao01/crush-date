@@ -6,12 +6,14 @@ import type {
   ContentItemListResponse,
   ContentType,
   ContentCategoryId,
+  ContentLocation,
   FoodCategoryOption,
   FoodContentItem,
   FoodListParams,
   PlaceCategoryOption,
   PlaceContentItem,
   PlaceListParams,
+  PoiSuggestionsResponse,
 } from '@/types/content'
 
 export type { ContentType }
@@ -27,6 +29,7 @@ export interface CreateContentItemInput {
   name: string
   type: string
   comment: string
+  location?: ContentLocation | null
 }
 
 export interface ContentItemListParams {
@@ -74,20 +77,33 @@ function buildQuery(values: Record<string, string | number | boolean | undefined
 
 export function createContentItem(input: CreateContentItemInput): Promise<ContentItem> {
   const baseURL = getBaseURL().replace(/\/$/, '')
+  const formData: Record<string, string> = {
+    contentType: input.contentType,
+    cityCode: input.cityCode,
+    categoryId: input.categoryId,
+    name: input.name,
+    type: input.type,
+    comment: input.comment,
+  }
+
+  if (input.location) {
+    Object.assign(formData, {
+      poiProvider: input.location.provider,
+      poiId: input.location.poiId,
+      poiTitle: input.location.title,
+      poiAddress: input.location.address,
+      poiLatitude: String(input.location.latitude),
+      poiLongitude: String(input.location.longitude),
+      poiAdcode: input.location.adcode,
+    })
+  }
 
   return new Promise((resolve, reject) => {
     uni.uploadFile({
       url: `${baseURL}/api/crush-date/content-items`,
       filePath: input.filePath,
       name: 'file',
-      formData: {
-        contentType: input.contentType,
-        cityCode: input.cityCode,
-        categoryId: input.categoryId,
-        name: input.name,
-        type: input.type,
-        comment: input.comment,
-      },
+      formData,
       success: (response) => {
         const data = parseResponse(response.data)
         if (response.statusCode >= 200 && response.statusCode < 300 && data && 'id' in data) {
@@ -125,6 +141,20 @@ export function getPlaceCategories(
   return request<PlaceCategoryListResponse>({
     url: '/api/crush-date/place-categories',
     showError: behavior.showError,
+  })
+}
+
+export function getPoiSuggestions(
+  cityCode: CityCode,
+  keyword: string,
+): Promise<PoiSuggestionsResponse> {
+  const normalizedKeyword = keyword.trim().slice(0, 50)
+  return request<PoiSuggestionsResponse>({
+    url: `/api/crush-date/map/poi-suggestions${buildQuery({
+      cityCode,
+      keyword: normalizedKeyword,
+    })}`,
+    showError: false,
   })
 }
 
