@@ -7,7 +7,7 @@ import CustomNavbar from '@/components/CustomNavbar/index.vue'
 import BackupPlanSheet from '@/components/plan/BackupPlanSheet.vue'
 import PlanHeroCard from '@/components/plan/PlanHeroCard.vue'
 import PlanListCard from '@/components/plan/PlanListCard.vue'
-import PlanPastCard from '@/components/plan/PlanPastCard.vue'
+import PastPlanCalendar from '@/components/plan/PastPlanCalendar.vue'
 import { usePlansStore } from '@/stores/plans'
 
 const plansStore = usePlansStore()
@@ -69,15 +69,7 @@ function openCompleted(id: string) {
 
       <view class="block">
         <text class="block__title">过去的计划</text>
-        <view v-if="completedPlans.length" class="block__list">
-          <PlanPastCard
-            v-for="plan in completedPlans"
-            :key="plan.id"
-            :plan="plan"
-            @tap="openCompleted(plan.id)"
-          />
-        </view>
-        <text v-else class="block__empty">完成一次计划后，回忆会留在这里。</text>
+        <PastPlanCalendar :plans="completedPlans" @select="openCompleted" />
       </view>
     </view>
     <BackupPlanSheet v-model="showCreateBackup" @saved="openBackup" />
