@@ -17,6 +17,8 @@ const configStore = useContentConfigStore()
 const {
   list,
   total,
+  loaded,
+  refreshError,
   loadingInitial,
   loadingMore,
   error,
@@ -86,6 +88,7 @@ function currentQuery() {
 
 async function refreshFoods(refreshCounts = false) {
   const query = currentQuery()
+  if (!foodsStore.isCurrentQuery(query)) uni.pageScrollTo({ scrollTop: 0, duration: 0 })
   const result = foodsStore.resetAndFetchFoods(query)
   if (refreshCounts) void foodsStore.fetchStatusCounts(query.cityCode)
   return result
@@ -98,7 +101,9 @@ async function retryPage() {
 
 onShow(async () => {
   await configStore.loadConfig()
-  await refreshFoods(true)
+  const query = currentQuery()
+  if (!foodsStore.isCurrentQuery(query)) uni.pageScrollTo({ scrollTop: 0, duration: 0 })
+  await foodsStore.ensureFoods(query)
 })
 
 onReachBottom(() => void foodsStore.loadMoreFoods())
@@ -248,6 +253,11 @@ function onCategorySelect({
 
       <text v-if="!loadingInitial && !error" class="summary">{{ summaryText }}</text>
 
+      <view v-if="refreshError && loaded" class="refresh-error">
+        <text>{{ refreshError }}</text>
+        <view role="button" @tap="retryPage"><text>重新加载</text></view>
+      </view>
+
       <view v-if="loadingInitial" class="grid grid--skeleton">
         <view v-for="index in 6" :key="index" class="skeleton-card">
           <view class="skeleton-card__image" />
@@ -257,7 +267,7 @@ function onCategorySelect({
         </view>
       </view>
 
-      <view v-else-if="error || configError" class="state-card">
+      <view v-else-if="(error || configError) && !loaded" class="state-card">
         <text class="state-card__title">加载失败了</text>
         <text class="state-card__description">{{ error || configError }}</text>
         <view class="state-card__button" hover-class="state-card__button--hover" @tap="retryPage">
@@ -281,7 +291,7 @@ function onCategorySelect({
       <template v-else>
         <view class="grid">
           <view
-            v-for="item in list"
+            v-for="(item, index) in list"
             :key="item.id"
             class="grid__item"
             :class="{
@@ -292,6 +302,7 @@ function onCategorySelect({
             <FoodCollectCard
               class="grid__card"
               :item="item"
+              :lazy-load="index >= 4"
               :category-name="getCategoryName(item.categoryId)"
             />
           </view>
@@ -327,6 +338,18 @@ function onCategorySelect({
 </template>
 
 <style lang="scss" scoped>
+.refresh-error {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 16rpx;
+  border-radius: 16rpx;
+  background: #ffecde;
+  color: #a56b56;
+  font-size: 24rpx;
+}
+
 .navbar-add {
   display: flex;
   width: 34px;

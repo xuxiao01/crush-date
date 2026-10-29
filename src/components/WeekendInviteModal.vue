@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { getCurrentInstance, nextTick, onUnmounted, ref, watch } from 'vue'
 import inviteBackground from '@/assets/invite-background.jpg'
 
@@ -193,7 +194,9 @@ onUnmounted(() => {
 
 <template>
   <view v-if="modelValue" class="invite-mask" @tap.stop>
-    <image
+    <AppImage
+      transparent
+      :fade="false"
       class="invite-mask__background"
       :src="inviteBackground"
       mode="aspectFill"
@@ -265,7 +268,8 @@ onUnmounted(() => {
 
     <view v-if="showRewardPrompt" class="reward-card" @tap.stop>
       <text class="reward-card__text"
-        >{{ rewardMessage }}<text v-if="rewardName" class="reward-card__name">{{ rewardName }}</text></text
+        >{{ rewardMessage
+        }}<text v-if="rewardName" class="reward-card__name">{{ rewardName }}</text></text
       >
       <view
         class="reward-agree"

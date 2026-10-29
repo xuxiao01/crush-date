@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
@@ -165,7 +166,7 @@ function retryConfig() {
         </view>
 
         <view v-if="image" class="cover-preview">
-          <image class="cover-preview__image" :src="image" mode="aspectFill" />
+          <AppImage class="cover-preview__image" :src="image" mode="aspectFill" />
           <view class="cover-preview__actions">
             <view class="cover-action" @tap="chooseCover"><text>更换图片</text></view>
             <view class="cover-action cover-action--danger" @tap="clearCover"

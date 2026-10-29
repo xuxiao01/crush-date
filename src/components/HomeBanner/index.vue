@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { ref } from 'vue'
+import { useAdjacentImages } from '@/utils/useAdjacentImages'
 import { MEMORIES } from '@/data/memories'
 
 const current = ref(0)
 const total = MEMORIES.length
+const mountedImages = useAdjacentImages(current, total)
 
 function onChange(event: { detail: { current: number } }) {
   current.value = event.detail.current
@@ -26,13 +29,14 @@ function openAlbum() {
       :duration="500"
       @change="onChange"
     >
-      <swiper-item v-for="item in MEMORIES" :key="item.id">
+      <swiper-item v-for="(item, index) in MEMORIES" :key="item.id">
         <view class="home-banner__slide">
-          <image
+          <AppImage
+            v-if="mountedImages.has(index)"
             class="home-banner__image"
             :src="item.image"
             mode="aspectFill"
-            :style="{ objectPosition: item.objectPosition }"
+            :image-style="{ objectPosition: item.objectPosition }"
           />
           <view class="home-banner__mask" />
           <view class="home-banner__meta">

@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import type { FoodCardItem } from '@/types/food'
 
 const props = defineProps<{
   item: FoodCardItem
   categoryName?: string
+  lazyLoad?: boolean
 }>()
 
 function goDetail() {
@@ -25,7 +27,12 @@ function goDetail() {
       :class="item.status === 'visited' ? 'food-card--visited' : 'food-card--unvisited'"
     >
       <view class="food-card__cover">
-        <image class="food-card__image" :src="item.image" mode="aspectFill" lazy-load />
+        <AppImage
+          class="food-card__image"
+          :src="item.image"
+          mode="aspectFill"
+          :lazy-load="lazyLoad"
+        />
       </view>
 
       <view class="food-card__body">

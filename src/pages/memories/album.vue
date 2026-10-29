@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import CustomNavbar from '@/components/CustomNavbar/index.vue'
+import { useAdjacentImages } from '@/utils/useAdjacentImages'
 import { MEMORIES } from '@/data/memories'
 
 const current = ref(0)
 const total = MEMORIES.length
 const ready = ref(false)
+const mountedImages = useAdjacentImages(current, total, ready)
 
 const active = computed(() => MEMORIES[current.value] ?? MEMORIES[0])
 
@@ -40,13 +43,14 @@ function onChange(event: { detail: { current: number } }) {
       :duration="400"
       @change="onChange"
     >
-      <swiper-item v-for="item in MEMORIES" :key="item.id">
+      <swiper-item v-for="(item, index) in MEMORIES" :key="item.id">
         <view class="album__slide">
-          <image
+          <AppImage
+            v-if="mountedImages.has(index)"
             class="album__image"
             :src="item.image"
             mode="aspectFill"
-            :style="{ objectPosition: item.objectPosition }"
+            :image-style="{ objectPosition: item.objectPosition }"
           />
         </view>
       </swiper-item>

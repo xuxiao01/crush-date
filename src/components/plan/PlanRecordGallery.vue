@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { computed, ref } from 'vue'
 import type { PlanItem } from '@/types/plan'
 import { PERIOD_LABELS } from '@/types/plan'
@@ -56,9 +57,10 @@ function tileClass(groupIndex: number, itemIndex: number) {
           :hover-stay-time="100"
           @tap="openItem(item)"
         >
-          <image
+          <AppImage
             v-if="item.image"
             class="record-gallery__image"
+            :lazy-load="groupIndex * 3 + itemIndex >= 4"
             :src="item.image"
             mode="aspectFill"
           />
@@ -80,7 +82,7 @@ function tileClass(groupIndex: number, itemIndex: number) {
     <view v-if="selectedItem" class="item-mask" @tap="closeItem">
       <view class="item-dialog" @tap.stop>
         <button class="item-dialog__close" @tap="closeItem">×</button>
-        <image
+        <AppImage
           v-if="selectedItem.image"
           class="item-dialog__cover"
           :src="selectedItem.image"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
@@ -10,7 +11,7 @@ import { usePlansStore } from '@/stores/plans'
 import { formatZhDate, getEarliestSelectablePlanDate, toPlanDateString } from '@/utils/planDate'
 import { deletePhotosSequentially } from '@/utils/planPhotos'
 
-const MAX_FEATURED_PHOTOS = 9
+const MAX_FEATURED_PHOTOS = 30
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024
 const SUPPORTED_PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 const SUPPORTED_PHOTO_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -55,7 +56,8 @@ const uploadButtonText = computed(() => {
   if (processingPhotos.value) return `裁剪中 ${uploadCurrent.value}/${uploadTotal.value}`
   if (photosLoading.value || !photosReady.value) return '正在加载…'
   if (photoLoadError.value) return '请先重新加载'
-  if (featuredPhotos.value.length >= MAX_FEATURED_PHOTOS) return '最多上传 9 张'
+  if (featuredPhotos.value.length >= MAX_FEATURED_PHOTOS)
+    return `最多上传 ${MAX_FEATURED_PHOTOS} 张`
   return '＋ 上传精选图片'
 })
 const deleteButtonText = computed(() =>
@@ -107,12 +109,12 @@ function chooseFeaturedPhotos() {
   }
   const remaining = MAX_FEATURED_PHOTOS - featuredPhotos.value.length
   if (remaining <= 0) {
-    uni.showToast({ title: '每个计划最多上传 9 张精选图片', icon: 'none' })
+    uni.showToast({ title: `每个计划最多上传 ${MAX_FEATURED_PHOTOS} 张精选图片`, icon: 'none' })
     return
   }
 
   uni.chooseImage({
-    count: remaining,
+    count: Math.min(9, remaining),
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     extension: SUPPORTED_PHOTO_EXTENSIONS,
@@ -143,7 +145,10 @@ function chooseFeaturedPhotos() {
 async function validateAndStartCropQueue(files: SelectedPhotoFile[]) {
   if (!files.length) return
   if (featuredPhotos.value.length + files.length > MAX_FEATURED_PHOTOS) {
-    uni.showToast({ title: '当前已有照片加上本次选择不能超过 9 张', icon: 'none' })
+    uni.showToast({
+      title: `当前已有照片加上本次选择不能超过 ${MAX_FEATURED_PHOTOS} 张`,
+      icon: 'none',
+    })
     return
   }
 
@@ -216,7 +221,8 @@ async function confirmPhotoCrop(result: { tempFilePath: string }) {
     }
 
     uploading.value = true
-    await uploadPlanPhoto(planId.value, result.tempFilePath)
+    const uploadedPhoto = await uploadPlanPhoto(planId.value, result.tempFilePath)
+    featuredPhotos.value.push(uploadedPhoto)
     uploadedBatchCount.value += 1
     cropQueue.value.shift()
     uploading.value = false
@@ -343,6 +349,8 @@ async function deleteSelectedPhotos() {
     },
   )
 
+  const deletedIds = new Set(result.deletedPhotoIds)
+  featuredPhotos.value = featuredPhotos.value.filter((photo) => !deletedIds.has(photo.id))
   await loadFeaturedPhotos()
   deletingSelectedPhotos.value = false
   deleteCurrent.value = 0
@@ -460,7 +468,9 @@ async function replan(value: string) {
       <view class="memories">
         <view class="section-head">
           <view class="section-head__copy">
-            <text class="section-title">精选照片 {{ featuredPhotos.length }}/9</text>
+            <text class="section-title"
+              >精选照片 {{ featuredPhotos.length }}/{{ MAX_FEATURED_PHOTOS }}</text
+            >
             <text class="section-subtitle">留下那天最喜欢的瞬间</text>
           </view>
           <view class="section-head__actions">
@@ -500,11 +510,11 @@ async function replan(value: string) {
         <view v-if="photosLoading" class="photo-loading">
           <text>正在加载精选照片…</text>
         </view>
-        <view v-else-if="photoLoadError" class="photo-error">
+        <view v-if="photoLoadError" class="photo-error">
           <text class="photo-error__message">{{ photoLoadError }}</text>
           <button class="photo-error__retry" @tap="loadFeaturedPhotos">重新加载</button>
         </view>
-        <view v-else-if="featuredPhotos.length" class="photos">
+        <view v-if="featuredPhotos.length" class="photos">
           <view
             v-for="(photo, index) in featuredPhotos"
             :key="photo.id"
@@ -512,7 +522,7 @@ async function replan(value: string) {
             :class="{ 'photo-item--selected': selectedPhotoIds.has(photo.id) }"
             @tap="handlePhotoTap(photo, index)"
           >
-            <image class="photo" :src="photo.url" mode="aspectFill" />
+            <AppImage class="photo" :lazy-load="index >= 6" :src="photo.url" mode="aspectFill" />
             <view
               v-if="isEditingPhotos"
               class="photo-selector"
@@ -530,10 +540,16 @@ async function replan(value: string) {
             {{ deleteButtonText }}
           </button>
         </view>
-        <view v-else-if="photosReady" class="photo-empty" @tap="chooseFeaturedPhotos">
+        <view
+          v-else-if="photosReady && !photosLoading && !photoLoadError"
+          class="photo-empty"
+          @tap="chooseFeaturedPhotos"
+        >
           <text class="photo-empty__icon">＋</text>
           <text class="photo-empty__title">上传第一张精选图片</text>
-          <text class="photo-empty__desc">支持 JPG、PNG、WebP，最多 9 张</text>
+          <text class="photo-empty__desc"
+            >支持 JPG、PNG、WebP，最多 {{ MAX_FEATURED_PHOTOS }} 张</text
+          >
         </view>
       </view>
     </view>

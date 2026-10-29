@@ -9,6 +9,7 @@ const props = defineProps<{
   period: PlanPeriod
   items: PlanItem[]
   readonly?: boolean
+  imageOffset?: number
 }>()
 
 const emit = defineEmits<{
@@ -28,9 +29,10 @@ const hasItems = computed(() => props.items.length > 0)
 
     <view v-if="hasItems" class="section__list">
       <PlanItemCard
-        v-for="item in items"
+        v-for="(item, index) in items"
         :key="item.id"
         :item="item"
+        :lazy-load="(imageOffset || 0) + index >= 4"
         :readonly="readonly"
         @remove="emit('remove', $event)"
       />

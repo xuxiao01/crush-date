@@ -15,7 +15,7 @@ const { activePlan, backupPlans, completedPlans } = storeToRefs(plansStore)
 const showCreateBackup = ref(false)
 
 onShow(() => {
-  void plansStore.hydrate(true)
+  void plansStore.hydrate()
 })
 
 function openActive(id: string) {
@@ -57,9 +57,10 @@ function openCompleted(id: string) {
         </view>
         <view v-if="backupPlans.length" class="block__list">
           <PlanListCard
-            v-for="plan in backupPlans"
+            v-for="(plan, index) in backupPlans"
             :key="plan.id"
             :plan="plan"
+            :lazy-load="index >= 3"
             @tap="openBackup(plan.id)"
           />
         </view>

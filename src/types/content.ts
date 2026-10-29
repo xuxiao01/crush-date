@@ -1,6 +1,6 @@
 export type ContentType = 'food' | 'place'
 
-export type CityCode = 'beijing' | 'tianjin' | 'harbin'
+export type CityCode = 'beijing' | 'tianjin' | 'harbin' | 'yinchuan' | 'zhongwei' | 'wuzhong'
 
 export type FoodCategoryId = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 export type PlaceCategoryId = '2' | '3' | '4' | '5' | '6' | '7'

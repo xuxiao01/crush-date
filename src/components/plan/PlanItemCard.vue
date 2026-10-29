@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import type { PlanItem } from '@/types/plan'
 
 defineProps<{
   item: PlanItem
+  lazyLoad?: boolean
   readonly?: boolean
 }>()
 
@@ -17,7 +19,7 @@ const emit = defineEmits<{
       <text class="item__title">{{ item.title }}</text>
       <text v-if="item.note" class="item__note">{{ item.note }}</text>
     </view>
-    <image class="item__cover" :src="item.image" mode="aspectFill" />
+    <AppImage class="item__cover" :src="item.image" :lazy-load="lazyLoad" mode="aspectFill" />
     <view v-if="!readonly" class="item__remove" @tap.stop="emit('remove', item.id)">
       <text class="item__remove-text">×</text>
     </view>

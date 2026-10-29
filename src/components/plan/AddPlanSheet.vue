@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { computed, ref, watch } from 'vue'
 import PeriodChips from '@/components/plan/PeriodChips.vue'
 import { usePlansStore } from '@/stores/plans'
@@ -19,6 +20,8 @@ const emit = defineEmits<{
 }>()
 
 const plansStore = usePlansStore()
+const submitting = ref(false)
+const initializing = ref(false)
 const mode = ref<'active' | 'backup' | 'new-backup'>('active')
 const selectedBackupId = ref('')
 const period = ref<PlanPeriod>('noon')
@@ -34,73 +37,94 @@ watch(
   () => props.modelValue,
   async (open) => {
     if (!open) return
-    await plansStore.hydrate()
-    mode.value = plansStore.activePlan ? 'active' : backups.value.length ? 'backup' : 'new-backup'
-    selectedBackupId.value = backups.value[0]?.id || ''
-    period.value = defaultPeriodForType(props.type)
-    itemNote.value = props.defaultNote || ''
-    backupTitle.value = ''
-    backupScenario.value = 'free'
-    backupScenarioText.value = '自由安排'
-    backupNote.value = ''
+    initializing.value = true
+    try {
+      await plansStore.hydrate()
+      if (!props.modelValue) return
+      mode.value = plansStore.activePlan ? 'active' : backups.value.length ? 'backup' : 'new-backup'
+      selectedBackupId.value = backups.value[0]?.id || ''
+      period.value = defaultPeriodForType(props.type)
+      itemNote.value = props.defaultNote || ''
+      backupTitle.value = ''
+      backupScenario.value = 'free'
+      backupScenarioText.value = '自由安排'
+      backupNote.value = ''
+    } finally {
+      initializing.value = false
+    }
   },
 )
 
 function close() {
+  if (submitting.value) return
   emit('update:modelValue', false)
 }
 function chooseBackup(id: string) {
+  if (submitting.value || initializing.value) return
   mode.value = 'backup'
   selectedBackupId.value = id
 }
 function selectScenario(value: PlanScenario) {
+  if (submitting.value || initializing.value) return
   backupScenario.value = value
   backupScenarioText.value = SCENARIO_LABELS[value]
 }
 async function submit() {
-  let target = mode.value === 'active' ? plansStore.activePlan : undefined
+  if (submitting.value || initializing.value) return
+  submitting.value = true
+  try {
+    let target = mode.value === 'active' ? plansStore.activePlan : undefined
 
-  if (mode.value === 'backup') {
-    target = plansStore.getById(selectedBackupId.value)
-  } else if (mode.value === 'new-backup') {
-    if (!backupTitle.value.trim()) {
-      uni.showToast({ title: '请填写备用计划标题', icon: 'none' })
+    if (mode.value === 'backup') {
+      target = plansStore.getById(selectedBackupId.value)
+    } else if (mode.value === 'new-backup') {
+      if (!backupTitle.value.trim()) {
+        uni.showToast({ title: '请填写备用计划标题', icon: 'none' })
+        return
+      }
+      const created = await plansStore.createBackup({
+        title: backupTitle.value,
+        scenario: backupScenario.value,
+        scenarioText: backupScenarioText.value,
+        note: backupNote.value,
+      })
+      if (!created.ok) return
+      target = created.plan
+      // Keep the new plan selected if adding the item fails, so retry does not create another.
+      selectedBackupId.value = target.id
+      mode.value = 'backup'
+    }
+
+    if (!target) {
+      uni.showToast({ title: '请选择一个计划', icon: 'none' })
       return
     }
-    const created = await plansStore.createBackup({
-      title: backupTitle.value,
-      scenario: backupScenario.value,
-      scenarioText: backupScenarioText.value,
-      note: backupNote.value,
+    const result = await plansStore.addItemToPlan(target.id, {
+      type: props.type,
+      sourceId: props.sourceId,
+      title: props.title,
+      image: props.image,
+      period: period.value,
+      note: itemNote.value,
     })
-    if (created.ok) target = created.plan
-  }
-
-  if (!target) {
-    uni.showToast({ title: '请选择一个计划', icon: 'none' })
-    return
-  }
-  const result = await plansStore.addItemToPlan(target.id, {
-    type: props.type,
-    sourceId: props.sourceId,
-    title: props.title,
-    image: props.image,
-    period: period.value,
-    note: itemNote.value,
-  })
-  if (!result.ok) {
-    uni.showToast({
-      title: result.reason === 'duplicate' ? '已经在这个计划里啦' : '加入失败',
-      icon: 'none',
+    if (!result.ok) {
+      uni.showToast({
+        title: result.reason === 'duplicate' ? '已经在这个计划里啦' : '加入失败',
+        icon: 'none',
+      })
+      return
+    }
+    emit('update:modelValue', false)
+    emit('success', {
+      planId: target.id,
+      planStatus: target.status,
+      label: target.title,
     })
-    return
+  } catch {
+    uni.showToast({ title: '加入失败，请稍后重试', icon: 'none' })
+  } finally {
+    submitting.value = false
   }
-  close()
-  emit('success', {
-    planId: target.id,
-    planStatus: target.status,
-    label: target.title,
-  })
 }
 </script>
 
@@ -109,7 +133,7 @@ async function submit() {
     <view class="sheet" @tap.stop>
       <text class="sheet__title">加入计划</text>
       <view class="preview"
-        ><image class="preview__image" :src="image" mode="aspectFill" /><text
+        ><AppImage class="preview__image" :src="image" mode="aspectFill" /><text
           class="preview__title"
           >{{ title }}</text
         ></view
@@ -120,7 +144,7 @@ async function submit() {
           v-if="plansStore.activePlan"
           class="chip"
           :class="{ 'chip--active': mode === 'active' }"
-          @tap="mode = 'active'"
+          @tap="!submitting && !initializing && (mode = 'active')"
           ><text>本次计划</text></view
         >
         <view
@@ -134,7 +158,7 @@ async function submit() {
         <view
           class="chip"
           :class="{ 'chip--active': mode === 'new-backup' }"
-          @tap="mode = 'new-backup'"
+          @tap="!submitting && !initializing && (mode = 'new-backup')"
           ><text>＋ 新建备用计划</text></view
         >
       </scroll-view>
@@ -143,6 +167,7 @@ async function submit() {
         <view class="field field--input"
           ><text class="field__label">场景标题</text
           ><input
+            :disabled="submitting || initializing"
             v-model="backupTitle"
             class="field__input"
             maxlength="20"
@@ -160,21 +185,48 @@ async function submit() {
         >
         <view class="field field--input"
           ><text class="field__label">场景标签</text
-          ><input v-model="backupScenarioText" class="field__input" maxlength="30"
+          ><input
+            :disabled="submitting || initializing"
+            v-model="backupScenarioText"
+            class="field__input"
+            maxlength="30"
         /></view>
         <view class="field field--input"
           ><text class="field__label">计划备注（可选）</text
-          ><input v-model="backupNote" class="field__input" maxlength="60"
+          ><input
+            :disabled="submitting || initializing"
+            v-model="backupNote"
+            class="field__input"
+            maxlength="60"
         /></view>
       </template>
 
       <text class="label">时间段</text>
-      <PeriodChips v-model="period" />
+      <PeriodChips v-model="period" :disabled="submitting || initializing" />
       <view class="field field--input field--note"
         ><text class="field__label">这个安排的备注（可选）</text
-        ><input v-model="itemNote" class="field__input" maxlength="40"
+        ><input
+          :disabled="submitting || initializing"
+          v-model="itemNote"
+          class="field__input"
+          maxlength="40"
       /></view>
-      <view class="submit" @tap="submit"><text>加入计划</text></view>
+      <button
+        class="submit"
+        :loading="submitting || initializing"
+        :disabled="submitting || initializing"
+        @tap="submit"
+      >
+        <text>{{
+          initializing
+            ? '加载中…'
+            : submitting
+              ? mode === 'new-backup'
+                ? '创建中…'
+                : '加入中…'
+              : '加入计划'
+        }}</text>
+      </button>
     </view>
   </view>
 </template>
@@ -298,6 +350,12 @@ async function submit() {
 .scenario--active {
   background: #ff8a55;
   color: #fff;
+}
+.submit[disabled] {
+  opacity: 0.65;
+}
+.submit::after {
+  border: none;
 }
 .submit {
   height: 90rpx;

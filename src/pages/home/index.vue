@@ -7,6 +7,7 @@ import CustomNavbar from '@/components/CustomNavbar/index.vue'
 import HomeBanner from '@/components/HomeBanner/index.vue'
 import HomeListCard from '@/components/HomeListCard/index.vue'
 import WeekendInviteModal from '@/components/WeekendInviteModal.vue'
+import CityPickerSheet from '@/components/CityPickerSheet/index.vue'
 import hotpotImage from '@/assets/素材-透明火锅.png'
 import castleImage from '@/assets/素材-透明摩天轮城堡.png'
 import { getFoods, getPlaces } from '@/api/content'
@@ -51,8 +52,8 @@ function handleCitySwitch() {
   showCitySheet.value = true
 }
 
-function onCitySelect({ item }: { item: { name: string; code: CityCode }; index: number }) {
-  configStore.setCurrentCity(item.code)
+function onCitySelect(code: CityCode) {
+  configStore.setCurrentCity(code)
   void loadTotals()
 }
 </script>
@@ -93,15 +94,14 @@ function onCitySelect({ item }: { item: { name: string; code: CityCode }; index:
         />
       </view>
     </view>
-
-    <wd-action-sheet
-      v-model="showCitySheet"
-      :actions="cities.map((city) => ({ name: city.name, code: city.code }))"
-      cancel-text="取消"
-      @select="onCitySelect"
-    />
   </BasePage>
 
+  <CityPickerSheet
+    v-model="showCitySheet"
+    :cities="cities"
+    :current-city-code="currentCityCode"
+    @select="onCitySelect"
+  />
   <WeekendInviteModal v-model="showInvite" @agreed="handleInviteAgreed" />
 </template>
 

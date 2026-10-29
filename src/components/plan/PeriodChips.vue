@@ -7,6 +7,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: PlanPeriod
     periods?: PlanPeriod[]
+    disabled?: boolean
   }>(),
   {
     periods: undefined,
@@ -17,9 +18,10 @@ const emit = defineEmits<{
   'update:modelValue': [PlanPeriod]
 }>()
 
-const options = computed(() => props.periods?.length ? props.periods : PERIOD_ORDER)
+const options = computed(() => (props.periods?.length ? props.periods : PERIOD_ORDER))
 
 function select(period: PlanPeriod) {
+  if (props.disabled) return
   emit('update:modelValue', period)
 }
 </script>

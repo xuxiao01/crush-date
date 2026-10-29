@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 const props = defineProps<{
   title: string
   description: string
@@ -30,7 +31,7 @@ function go() {
       <text class="list-card__tag-text">收藏了 {{ count }} 个地方</text>
     </view>
 
-    <image class="list-card__image" :src="image" mode="aspectFit" />
+    <AppImage class="list-card__image" :src="image" mode="aspectFit" transparent :fade="false" />
 
     <view class="list-card__arrow">
       <text class="list-card__arrow-icon">›</text>

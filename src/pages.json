@@ -7,6 +7,12 @@
   },
   "pages": [
     {
+      "path": "pages/lock/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/home/index",
       "style": {
         "navigationStyle": "custom"

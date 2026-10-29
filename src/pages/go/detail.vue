@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import BasePage from '@/components/BasePage/index.vue'
@@ -162,7 +163,7 @@ function onAddSuccess({
 
     <view v-else-if="place" class="detail">
       <view class="detail__cover-wrap">
-        <image class="detail__cover" :src="place.image" mode="aspectFill" />
+        <AppImage class="detail__cover" :src="place.image" mode="aspectFill" />
 
         <view
           v-if="showBadge"

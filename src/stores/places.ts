@@ -18,6 +18,10 @@ interface PlacesState {
   pageSize: number
   hasMore: boolean
   loading: boolean
+  loaded: boolean
+  refreshing: boolean
+  refreshError: string
+  invalidationVersion: number
   loadingInitial: boolean
   loadingMore: boolean
   error: string
@@ -31,9 +35,12 @@ interface PlacesState {
 }
 
 function querySignature(query: PlaceQuery): string {
-  return [query.cityCode, query.visited, query.categoryId ?? '', query.keyword?.trim() ?? ''].join(
-    '|',
-  )
+  return [
+    query.cityCode,
+    query.visited,
+    query.categoryId ?? '',
+    query.keyword?.trim().slice(0, 50) ?? '',
+  ].join('|')
 }
 
 export const usePlacesStore = defineStore('places', {
@@ -44,6 +51,10 @@ export const usePlacesStore = defineStore('places', {
     pageSize: 20,
     hasMore: true,
     loading: false,
+    loaded: false,
+    refreshing: false,
+    refreshError: '',
+    invalidationVersion: 0,
     loadingInitial: false,
     loadingMore: false,
     error: '',
@@ -65,23 +76,42 @@ export const usePlacesStore = defineStore('places', {
     },
   },
   actions: {
+    isCurrentQuery(query: PlaceQuery) {
+      return querySignature(query) === querySignature(this.query)
+    },
+    async ensurePlaces(query: PlaceQuery) {
+      if (this.isCurrentQuery(query)) {
+        if (this.loaded && !this.invalidated) return true
+        if (this.loading) return false
+      }
+      const result = await this.resetAndFetchPlaces(query)
+      if (result) void this.fetchStatusCounts(query.cityCode)
+      return result
+    },
     async resetAndFetchPlaces(query: PlaceQuery) {
       const normalized: PlaceQuery = {
         ...query,
         keyword: query.keyword?.trim().slice(0, 50) || undefined,
       }
+      const keepExisting = this.loaded && this.isCurrentQuery(normalized)
+      const invalidationVersion = this.invalidationVersion
       this.requestEpoch += 1
       const epoch = this.requestEpoch
       this.query = normalized
-      this.list = []
-      this.total = 0
-      this.page = 0
-      this.hasMore = true
+      if (!keepExisting) {
+        this.list = []
+        this.total = 0
+        this.page = 0
+        this.hasMore = true
+        this.loaded = false
+      }
       this.error = ''
+      this.refreshError = ''
       this.loadMoreError = ''
-      this.loadingInitial = true
+      this.loadingMore = false
+      this.loadingInitial = !keepExisting
+      this.refreshing = keepExisting
       this.loading = true
-      this.invalidated = false
 
       try {
         const response = await getPlaces(
@@ -90,6 +120,7 @@ export const usePlacesStore = defineStore('places', {
         )
         if (
           epoch !== this.requestEpoch ||
+          invalidationVersion !== this.invalidationVersion ||
           querySignature(normalized) !== querySignature(this.query)
         ) {
           return false
@@ -98,24 +129,31 @@ export const usePlacesStore = defineStore('places', {
         this.total = response.total
         this.page = response.page
         this.hasMore = response.hasMore
+        this.loaded = true
+        this.invalidated = false
         return true
       } catch (error) {
         if (epoch === this.requestEpoch) {
-          this.error = error instanceof Error ? error.message : '地点加载失败'
+          const message = error instanceof Error ? error.message : '地点加载失败'
+          if (keepExisting) this.refreshError = message
+          else this.error = message
         }
         return false
       } finally {
         if (epoch === this.requestEpoch) {
           this.loadingInitial = false
+          this.refreshing = false
           this.loading = false
         }
       }
     },
     async loadMorePlaces() {
-      if (this.loadingInitial || this.loadingMore || !this.hasMore || this.error) return false
+      if (this.loading || this.loadingMore || !this.hasMore || this.error || this.refreshError)
+        return false
 
       const epoch = this.requestEpoch
       const signature = querySignature(this.query)
+      const invalidationVersion = this.invalidationVersion
       const nextPage = this.page + 1
       this.loadingMore = true
       this.loadMoreError = ''
@@ -124,7 +162,12 @@ export const usePlacesStore = defineStore('places', {
           { ...this.query, page: nextPage, pageSize: this.pageSize },
           { showError: false },
         )
-        if (epoch !== this.requestEpoch || signature !== querySignature(this.query)) return false
+        if (
+          epoch !== this.requestEpoch ||
+          invalidationVersion !== this.invalidationVersion ||
+          signature !== querySignature(this.query)
+        )
+          return false
 
         const existingIds = new Set(this.list.map((item) => item.id))
         this.list.push(
@@ -169,6 +212,7 @@ export const usePlacesStore = defineStore('places', {
     },
     invalidate() {
       this.invalidated = true
+      this.invalidationVersion += 1
     },
     addPlace(payload: Pick<PlaceCardItem, 'id' | 'name' | 'type' | 'comment' | 'image'>) {
       const item: PlaceCardItem = { ...payload, status: 'unvisited', visitedDate: '' }
@@ -177,11 +221,11 @@ export const usePlacesStore = defineStore('places', {
       return item
     },
     removePlace(id: string) {
+      this.invalidate()
       const index = this.list.findIndex((item) => item.id === id)
       if (index < 0) return false
       this.list.splice(index, 1)
       this.total = Math.max(0, this.total - 1)
-      this.invalidated = true
       return true
     },
     getById(id: string) {
@@ -191,7 +235,7 @@ export const usePlacesStore = defineStore('places', {
       try {
         const updated = await updateContentItemVisited<PlaceContentItem>(id, visited)
         this.removePlace(id)
-        this.invalidated = true
+        this.invalidate()
         return toPlaceCardItem(updated)
       } catch {
         return false

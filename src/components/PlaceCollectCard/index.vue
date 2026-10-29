@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import type { PlaceCardItem } from '@/types/place'
 
 const props = defineProps<{
   item: PlaceCardItem
   categoryName?: string
+  lazyLoad?: boolean
 }>()
 
 function goDetail() {
@@ -25,7 +27,12 @@ function goDetail() {
       :class="item.status === 'visited' ? 'place-card--visited' : 'place-card--unvisited'"
     >
       <view class="place-card__cover">
-        <image class="place-card__image" :src="item.image" mode="aspectFill" lazy-load />
+        <AppImage
+          class="place-card__image"
+          :src="item.image"
+          mode="aspectFill"
+          :lazy-load="lazyLoad"
+        />
       </view>
 
       <view class="place-card__body">

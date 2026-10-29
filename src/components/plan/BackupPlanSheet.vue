@@ -11,6 +11,7 @@ const emit = defineEmits<{
 }>()
 
 const plansStore = usePlansStore()
+const submitting = ref(false)
 const title = ref('')
 const scenario = ref<PlanScenario>('free')
 const scenarioText = ref('')
@@ -55,10 +56,12 @@ onUnmounted(() => {
 })
 
 function close() {
+  if (submitting.value) return
   emit('update:modelValue', false)
 }
 
 function selectScenario(value: PlanScenario) {
+  if (submitting.value) return
   scenario.value = value
   if (!scenarioText.value.trim() || Object.values(SCENARIO_LABELS).includes(scenarioText.value)) {
     scenarioText.value = SCENARIO_LABELS[value]
@@ -66,31 +69,39 @@ function selectScenario(value: PlanScenario) {
 }
 
 async function submit() {
+  if (submitting.value) return
   if (!title.value.trim()) {
     uni.showToast({ title: '请填写备用计划标题', icon: 'none' })
     return
   }
-  if (props.plan) {
-    const saved = await plansStore.updatePlanMeta(props.plan.id, {
-      title: title.value,
-      scenario: scenario.value,
-      scenarioText: scenarioText.value,
-      note: note.value,
-    })
-    if (!saved) return
-    close()
-    emit('saved', props.plan.id)
-    return
-  }
-  const result = await plansStore.createBackup({
-    title: title.value,
-    scenario: scenario.value,
-    scenarioText: scenarioText.value,
-    note: note.value,
-  })
-  if (result.ok) {
-    close()
-    emit('saved', result.plan.id)
+  submitting.value = true
+  try {
+    let savedId: string
+    if (props.plan) {
+      const saved = await plansStore.updatePlanMeta(props.plan.id, {
+        title: title.value,
+        scenario: scenario.value,
+        scenarioText: scenarioText.value,
+        note: note.value,
+      })
+      if (!saved) return
+      savedId = props.plan.id
+    } else {
+      const result = await plansStore.createBackup({
+        title: title.value,
+        scenario: scenario.value,
+        scenarioText: scenarioText.value,
+        note: note.value,
+      })
+      if (!result.ok) return
+      savedId = result.plan.id
+    }
+    emit('update:modelValue', false)
+    emit('saved', savedId)
+  } catch {
+    uni.showToast({ title: '保存失败，请稍后重试', icon: 'none' })
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -101,7 +112,13 @@ async function submit() {
       <text class="title">{{ plan ? '编辑备用计划' : '新建备用计划' }}</text>
       <view class="field field--input">
         <text class="field__label">场景标题</text>
-        <input v-model="title" class="field__input" maxlength="20" placeholder="例如：下雨的时候" />
+        <input
+          :disabled="submitting"
+          v-model="title"
+          class="field__input"
+          maxlength="20"
+          placeholder="例如：下雨的时候"
+        />
       </view>
       <text class="label">天气场景</text>
       <view class="scenarios">
@@ -118,6 +135,7 @@ async function submit() {
       <view class="field field--input">
         <text class="field__label">场景标签</text>
         <input
+          :disabled="submitting"
           v-model="scenarioText"
           class="field__input"
           maxlength="30"
@@ -127,15 +145,18 @@ async function submit() {
       <view class="field field--input">
         <text class="field__label">备注（可选）</text>
         <input
+          :disabled="submitting"
           v-model="note"
           class="field__input"
           maxlength="60"
           placeholder="记录这个方案适合什么时候"
         />
       </view>
-      <view class="submit" @tap="submit">
-        <text class="submit__text">{{ plan ? '保存修改' : '保存并进入行程规划' }}</text>
-      </view>
+      <button class="submit" :loading="submitting" :disabled="submitting" @tap="submit">
+        <text class="submit__text">{{
+          submitting ? (plan ? '保存中…' : '创建中…') : plan ? '保存修改' : '保存并进入行程规划'
+        }}</text>
+      </button>
     </view>
   </view>
 </template>
@@ -230,6 +251,12 @@ async function submit() {
   justify-content: center;
   border-radius: 999rpx;
   background: linear-gradient(90deg, #ff8a55, #ff8f9d);
+}
+.submit[disabled] {
+  opacity: 0.65;
+}
+.submit::after {
+  border: none;
 }
 .submit__text {
   font-size: 30rpx;

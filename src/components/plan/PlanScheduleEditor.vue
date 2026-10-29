@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppImage from '@/components/AppImage/index.vue'
 import { computed, ref, watch } from 'vue'
 import PlanPeriodSection from '@/components/plan/PlanPeriodSection.vue'
 import { getFoods, getPlaces } from '@/api/content'
@@ -70,6 +71,13 @@ function itemsOf(period: PlanPeriod) {
       .sort((a, b) => a.order - b.order) || []
   )
 }
+function itemsBefore(period: PlanPeriod) {
+  return (
+    plan.value?.items.filter(
+      (item) => PERIOD_ORDER.indexOf(item.period) < PERIOD_ORDER.indexOf(period),
+    ).length || 0
+  )
+}
 function openAdd(period: PlanPeriod) {
   if (props.readonly) return
   editPeriod.value = period
@@ -133,6 +141,7 @@ async function pickCandidate(item: {
       :key="period"
       :period="period"
       :items="itemsOf(period)"
+      :image-offset="itemsBefore(period)"
       :readonly="readonly"
       @add="openAdd(period)"
       @remove="requestRemoveItem"
@@ -174,13 +183,16 @@ async function pickCandidate(item: {
         ></view
       ><scroll-view scroll-y class="picker"
         ><view
-          v-for="item in candidates"
+          v-for="(item, index) in candidates"
           :key="item.id"
           class="picker__item"
           @tap="pickCandidate(item)"
-          ><image class="picker__image" :src="item.image" mode="aspectFill" /><text>{{
-            item.title
-          }}</text></view
+          ><AppImage
+            class="picker__image"
+            :lazy-load="index >= 4"
+            :src="item.image"
+            mode="aspectFill"
+          /><text>{{ item.title }}</text></view
         ></scroll-view
       ></view
     ></view
